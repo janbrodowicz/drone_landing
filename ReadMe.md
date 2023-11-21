@@ -1,6 +1,6 @@
-### Landing of a drone with MAVROS, ROS, PX4, Gazebo
+# Landing of a drone with MAVROS, ROS, PX4, Gazebo
 
-## Steps before launching
+### Steps before launching
 
 1. Install ROS1 Noetic with Gazebo (full build): https://wiki.ros.org/noetic/Installation/Ubuntu
 2. Download OpenCv (C++) preferably 4.2.0 
@@ -14,7 +14,7 @@
           <frameName>/lidar_sensor_link</frameName>
         </plugin>
 
-## Launching steps
+### Launching steps
 
 1. Go to ~/workspace_dir and build the workspace; command: "catkin build"
 2. Go to ~/workspace_dir/src/ros_landing/ and run eviroment_vars.sh; command: ". ./enviroment_vars.sh" (open the file 	before and check if the paths match with yours)
