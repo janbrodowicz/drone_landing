@@ -18,6 +18,6 @@
 
 ### Launching steps
 
-1. Go to ~/workspace_dir and build the workspace; command: "catkin build"
-2. Go to ~/workspace_dir/src/ros_landing/ and run eviroment_vars.sh; command: ". ./enviroment_vars.sh" (open the file 	before and check if the paths match with yours)
-3. Run the siumulation; command: "roslaunch ros_landing ros_landing_launch.launch"
+1. Go to ~/workspace_dir and build the workspace; command: `catkin build`
+2. Go to ~/workspace_dir/src/ros_landing/ and run eviroment_vars.sh; command: `. ./enviroment_vars.sh` (open the file 	before and check if the paths match with yours)
+3. Run the siumulation; command: `roslaunch ros_landing ros_landing_launch.launch`
