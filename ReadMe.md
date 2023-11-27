@@ -21,3 +21,9 @@
 1. Go to ~/workspace_dir and build the workspace; command: `catkin build`
 2. Go to ~/workspace_dir/src/ros_landing/ and run eviroment_vars.sh; command: `. ./enviroment_vars.sh` (open the file 	before and check if the paths match with yours)
 3. Run the siumulation; command: `roslaunch ros_landing ros_landing_launch.launch`
+
+### Solving issues
+
+1. If package does not build because "No rule to make target" error appears then depending on the rest you need to make symbolic links beetwen the path where the files accually exist and where they should: 
+
+	`sudo ln -s /usr/local/lib/*.so.4.2.0 /usr/lib/x86_64-linux-gnu/` - worked for my setup
