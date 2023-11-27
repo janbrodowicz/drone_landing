@@ -1,4 +1,4 @@
-#include "AltitudeDataProcessingBase.h"
+#include "VisionProcessing/AltitudeDataProcessingBase.h"
 
 using namespace altitude;
 

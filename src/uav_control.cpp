@@ -19,47 +19,6 @@
 #define KEYCODE_D 0x64
 
 
-char getch()
-{
-	fd_set set;
-	struct timeval timeout;
-	int rv;
-	char buff = 0;
-	int len = 1;
-	int filedesc = 0;
-	FD_ZERO(&set);
-	FD_SET(filedesc, &set);
-	
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 1000;
-
-	rv = select(filedesc + 1, &set, NULL, NULL, &timeout);
-
-	struct termios old = {0};
-	if (tcgetattr(filedesc, &old) < 0)
-		ROS_ERROR("tcsetattr()");
-	old.c_lflag &= ~ICANON;
-	old.c_lflag &= ~ECHO;
-	old.c_cc[VMIN] = 1;
-	old.c_cc[VTIME] = 0;
-	if (tcsetattr(filedesc, TCSANOW, &old) < 0)
-		ROS_ERROR("tcsetattr ICANON");
-
-	if(rv == -1)
-		ROS_ERROR("select");
-	// else if(rv == 0)
-	// 	ROS_INFO("no_key_pressed");
-	else if(rv != 0)
-		read(filedesc, &buff, len );
-
-	old.c_lflag |= ICANON;
-	old.c_lflag |= ECHO;
-	if (tcsetattr(filedesc, TCSADRAIN, &old) < 0)
-		ROS_ERROR ("tcsetattr ~ICANON");
-	return (buff);
-}
-
-
 class UavControl
 {
     public:
@@ -97,6 +56,46 @@ class UavControl
         mavros_msgs::State get_curr_state()
         {
             return current_state;
+        }
+
+        char getch()
+        {
+            fd_set set;
+            struct timeval timeout;
+            int rv;
+            char buff = 0;
+            int len = 1;
+            int filedesc = 0;
+            FD_ZERO(&set);
+            FD_SET(filedesc, &set);
+            
+            timeout.tv_sec = 0;
+            timeout.tv_usec = 1000;
+
+            rv = select(filedesc + 1, &set, NULL, NULL, &timeout);
+
+            struct termios old = {0};
+            if (tcgetattr(filedesc, &old) < 0)
+                ROS_ERROR("tcsetattr()");
+            old.c_lflag &= ~ICANON;
+            old.c_lflag &= ~ECHO;
+            old.c_cc[VMIN] = 1;
+            old.c_cc[VTIME] = 0;
+            if (tcsetattr(filedesc, TCSANOW, &old) < 0)
+                ROS_ERROR("tcsetattr ICANON");
+
+            if(rv == -1)
+                ROS_ERROR("select");
+            // else if(rv == 0)
+            // 	ROS_INFO("no_key_pressed");
+            else if(rv != 0)
+                read(filedesc, &buff, len );
+
+            old.c_lflag |= ICANON;
+            old.c_lflag |= ECHO;
+            if (tcsetattr(filedesc, TCSADRAIN, &old) < 0)
+                ROS_ERROR ("tcsetattr ~ICANON");
+            return (buff);
         }
     
     private:
@@ -166,7 +165,7 @@ int main(int argc, char **argv)
 
         // get input from keyboard with out enter
         char c = 0;
-		c = getch();
+		c = uav.getch();
 
 		switch(c)
 		{

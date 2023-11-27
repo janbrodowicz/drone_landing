@@ -9,7 +9,7 @@
     <!-- camera -->
     <include>
       <uri>model://fpv_cam</uri>
-      <pose>0 0 0 0 1.5708 0</pose>
+      <pose>0 0 0.05 0 1.5708 0</pose>
     </include>
     <joint name="fpv_cam_joint" type="fixed">
       <child>fpv_cam::link</child>
@@ -26,7 +26,7 @@
     <!-- lidar -->
     <include>
       <uri>model://lidar</uri>
-      <pose>0 0 -0.05 0 0 0</pose>
+      <pose>0 0 -0.02 0 0 0</pose>
     </include>
 
     <joint name="lidar_joint" type="fixed">
