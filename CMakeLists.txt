@@ -82,7 +82,7 @@ include_directories(
 )
 
 add_library(altitudeProcessing src/VisionProcessing/AltitudeDataProcessing.cpp src/VisionProcessing/AltitudeDataProcessingBase.cpp)
-target_link_libraries(altitudeProcessing ${OpenCV_LIBS})
+# target_link_libraries(altitudeProcessing ${OpenCV_LIBS})
 
 add_library(frameProcessing src/VisionProcessing/FrameProcessing.cpp)
 target_link_libraries(frameProcessing ${OpenCV_LIBS})

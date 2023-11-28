@@ -3,7 +3,7 @@
 using namespace altitude;
 
 
-AltitudeDataProcessingBase::AltitudeDataProcessingBase(double altitude) : 
+AltitudeDataProcessingBase::AltitudeDataProcessingBase(float altitude) : 
     m_altitude(altitude)
 {
 

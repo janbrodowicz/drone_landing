@@ -9,7 +9,7 @@ class DefaultAltitude : public AltitudeDataProcessingBase
 {
     public:
 
-        DefaultAltitude(double altitude);
+        DefaultAltitude(float altitude);
 
         int exp_circle_size(void) override;
 
@@ -21,7 +21,7 @@ class LidarAltitude : public AltitudeDataProcessingBase
 {
     public:
 
-        LidarAltitude(double altitude);
+        LidarAltitude(float altitude);
 
         int exp_circle_size(void) override;
     
@@ -33,7 +33,7 @@ class PixhawkAltitude : public AltitudeDataProcessingBase
 {
     public:
 
-        PixhawkAltitude(double altitude);
+        PixhawkAltitude(float altitude);
 
         int exp_circle_size(void) override;
     

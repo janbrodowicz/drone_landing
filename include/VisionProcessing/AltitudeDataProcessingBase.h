@@ -8,13 +8,13 @@ class AltitudeDataProcessingBase : public IAltitudeDataProcessing
 {
     public:
 
-        AltitudeDataProcessingBase(double altitude);
+        AltitudeDataProcessingBase(float altitude);
 
         int exp_square_size(int circle_size) override;
 
     protected:
 
-        double m_altitude;
+        float m_altitude;
 
 };
 
