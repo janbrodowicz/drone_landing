@@ -6,6 +6,7 @@
 #include <message_filters/synchronizer.h>
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
+#include <ros_landing/droneLand.h>
 
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
@@ -35,8 +36,7 @@ class VisionProcessingControll
     public:
         VisionProcessingControll() : sync(image_sub, lidar_sub, 100), it(nh)
         {
-            // image_sub = it.subscribe("/iris/usb_cam/image_raw", 1, &VisionProcessingControll::image_cb, this);
-            image_pub = it.advertise("vision_processing/output_img", 1);
+            droneLand_pub = nh.advertise<ros_landing::droneLand>("/droneLand", 10);
 
             image_sub.subscribe(nh, "/iris/usb_cam/image_raw", 1);
             lidar_sub.subscribe(nh, "/laser/scan", 1);
@@ -136,13 +136,17 @@ class VisionProcessingControll
             double angle = std::get<2>(iter_res);
             std::vector<std::vector<double>> dist_vec = object.calc_dist(centre);
 
+            // Publish data for drone controll (with PID)
+            ros_landing::droneLand msgDrone;
+            msgDrone.X = dist_vec[1][0];
+            msgDrone.Y = dist_vec[1][1];
+            msgDrone.angle = angle;
+            msgDrone.header.stamp = ros::Time::now();
+            droneLand_pub.publish(msgDrone);
+
             // Showing the processed image
             cv::imshow("Image window", image_det);
             cv::waitKey(3);
-
-            // Creating output message and publishing it
-            sensor_msgs::ImagePtr msg_out = cv_bridge::CvImage(std_msgs::Header(), "rgb8", image_det).toImageMsg();
-            image_pub.publish(msg_out);
 
             ROS_INFO("X distance [cm]: %f, Y distance [cm]: %f, Orientation angle [deg]: %f", dist_vec[1][0], dist_vec[1][1], angle);
 
@@ -151,8 +155,7 @@ class VisionProcessingControll
     private:
         ros::NodeHandle nh;
         image_transport::ImageTransport it;
-        // image_transport::Subscriber image_sub;
-        image_transport::Publisher image_pub;
+        ros::Publisher droneLand_pub;
         message_filters::Subscriber<sensor_msgs::Image> image_sub;
         message_filters::Subscriber<sensor_msgs::LaserScan> lidar_sub;
         message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::LaserScan> sync;
