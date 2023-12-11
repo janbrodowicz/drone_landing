@@ -1,0 +1,14 @@
+K_kryt = 0.8 (mniej wiecej)
+T_osc = 4.5s
+
+Ziegler-Nichols:
+
+a) PID
+	* Kp = 0.6 * k_kryt = 0.48
+	* Ti = 0.5 * T_osc = 2.25 --> Ki = Kp/Ti = 0.213
+	* Td = 0.12 * T_osc = 0.54 --> Kd = Kp * Td = 0.259
+b) PI
+	* Kp = 0.45 * k_kryt = 0.36
+	* Ti = 0.85 * T_osc = 3.825 --> Ki = Kp/Ti = 0.094
+c) P
+	* Kp = 0.5 * k_kryt = 0.4

@@ -12,6 +12,7 @@ find_package(catkin REQUIRED
     image_transport
     message_filters
     message_generation
+    rosbag
 )
 
 find_package(OpenCV 4 REQUIRED)

@@ -6,6 +6,7 @@
 #include <ros_landing/droneLand.h>
 #include <std_msgs/Float32.h>
 #include <sensor_msgs/LaserScan.h>
+#include <rosbag/bag.h>
 
 #include <termios.h>
 
@@ -54,14 +55,16 @@ class PIDController
         {
             return {m_Kp, m_Ki, m_Kd};
         }
+
+        double m_sum;
+        double m_prev;
     
     private:
 
         double m_Kp;
         double m_Ki;
         double m_Kd;
-        double m_sum;
-        double m_prev;
+        
 };
 
 
@@ -81,6 +84,13 @@ class UavControl
 
             PIDx = nh.advertise<std_msgs::Float32>("PID/x", 10);
             PIDy = nh.advertise<std_msgs::Float32>("PID/y", 10);
+
+            bag_pid.open("pid_output.bag", rosbag::bagmode::Write);
+        }
+
+        ~UavControl()
+        {
+            bag_pid.close();
         }
 
         void state_cb(const mavros_msgs::State::ConstPtr& msg)
@@ -102,21 +112,25 @@ class UavControl
             {
                 double delta_t = (ros::Time::now() - time_now).toSec();
 
-                m_x = msg->X;
-                m_y = msg->Y;
+                // calculate from cm to m
+                m_x = msg->X / 100.0;
+                m_y = msg->Y / 100.0;
 
-                // TODO: figure out how to scale properly
-                double x = pid_x.run(0, msg->X, delta_t);
-                double y = pid_y.run(0, msg->Y, delta_t);
-
-                m_x_pid = x / 700.0;
-                m_y_pid = y / 700.0;
+                m_x_pid = pid_x.run(0, m_x, delta_t);
+                m_y_pid = pid_y.run(0, m_y, delta_t);
 
                 // Publishing PID output for rqt to plot
                 std_msgs::Float32 x_msg;
                 std_msgs::Float32 y_msg;
-                x_msg.data = x;
-                y_msg.data = y;
+                x_msg.data = m_x_pid;
+                y_msg.data = m_y_pid;
+
+                // write data to a bag file
+                if(m_landing)
+                {
+                    bag_pid.write("pid_x", ros::Time::now(), x_msg);
+                    bag_pid.write("pid_y", ros::Time::now(), y_msg);
+                }
 
                 PIDx.publish(x_msg);
                 PIDy.publish(y_msg);
@@ -214,6 +228,8 @@ class UavControl
 
         ros::Publisher PIDx;
         ros::Publisher PIDy;
+
+        rosbag::Bag bag_pid;
 };
 
 int main(int argc, char **argv)
@@ -248,9 +264,11 @@ int main(int argc, char **argv)
         rate.sleep();
     }
 
+    // set OFFBOARD mode to controll drone from PC (message)
     mavros_msgs::SetMode offb_set_mode;
     offb_set_mode.request.custom_mode = "OFFBOARD";
 
+    // arm the drone (message)
     mavros_msgs::CommandBool arm_cmd;
     arm_cmd.request.value = true;
 
@@ -365,15 +383,22 @@ int main(int argc, char **argv)
                 }
 				break;
             case KEYCODE_C:
+                // turn on automatic landing
                 uav.m_landing = true;
                 break;
             case KEYCODE_V:
+                // turn off automatic landing also clear sum of errors and previous error for PIDs
                 uav.m_landing = false;
+                uav.pid_x.m_sum = 0;
+                uav.pid_y.m_sum = 0;
+                uav.pid_x.m_prev = 0;
+                uav.pid_y.m_prev = 0;
                 break;
 			default:
 				break;				
 		}
-
+        
+        // if automatic landing is turned on and landing pad is detected
         if(uav.m_landing && uav.m_ang != -500)
         {
             // X and Y are different for drone coordinate frame and image frame
@@ -381,10 +406,12 @@ int main(int argc, char **argv)
             pos.velocity.x = uav.m_y_pid;
             pos.velocity.z = 0;
 
-            if(std::abs(uav.m_x) <= 10 && std::abs(uav.m_y) <= 10 && uav.m_lidar > 0.4)
-            {
-                pos.velocity.z = -0.1;
-            }
+            // if distances on X and Y from center of the landing pad is less than 10cm and altitude is more than 1cm
+            // if(std::abs(uav.m_x) <= 0.1 && std::abs(uav.m_y) <= 0.1 && uav.m_lidar > 0.1)
+            // {
+            //     // lower the altitude (by velocity)
+            //     pos.velocity.z = -0.1;
+            // }
 
             ROS_INFO("PID output: X: %f, Y: %f", uav.m_x, uav.m_y);
         }
