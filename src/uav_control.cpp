@@ -407,11 +407,11 @@ int main(int argc, char **argv)
             pos.velocity.z = 0;
 
             // if distances on X and Y from center of the landing pad is less than 10cm and altitude is more than 1cm
-            // if(std::abs(uav.m_x) <= 0.1 && std::abs(uav.m_y) <= 0.1 && uav.m_lidar > 0.1)
-            // {
-            //     // lower the altitude (by velocity)
-            //     pos.velocity.z = -0.1;
-            // }
+            if(std::abs(uav.m_x) <= 0.1 && std::abs(uav.m_y) <= 0.1 && uav.m_lidar > 0.1)
+            {
+                // lower the altitude (by velocity)
+                pos.velocity.z = -0.1;
+            }
 
             ROS_INFO("PID output: X: %f, Y: %f", uav.m_x, uav.m_y);
         }

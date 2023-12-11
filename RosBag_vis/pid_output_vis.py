@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-b = bagreader("pid_kryt_output.bag")
+b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/pid_output_landing_P.bag")
 PID_X = b.message_by_topic("pid_x")
 PID_Y = b.message_by_topic("pid_y")
 
@@ -44,5 +44,14 @@ df_pid_y = pd.read_csv(PID_Y)
 # ax[0].grid()
 # ax[1].plot(df_pid_y["Time"].tolist(), df_pid_y["data"].tolist())
 # ax[1].set_ylim([-0.4, 0.4])
+# ax[1].grid()
+# plt.show()
+
+# Below figure is done for PID type P landing
+# fig, ax = plt.subplots(2)
+# ax[0].plot(df_pid_x["Time"].tolist(), df_pid_x["data"].tolist())
+# ax[0].grid()
+# ax[1].plot(df_pid_y["Time"].tolist(), df_pid_y["data"].tolist())
+# # ax[1].set_ylim([-0.4, 0.4])
 # ax[1].grid()
 # plt.show()
