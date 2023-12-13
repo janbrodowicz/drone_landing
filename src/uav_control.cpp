@@ -6,11 +6,17 @@
 #include <ros_landing/droneLand.h>
 #include <std_msgs/Float32.h>
 #include <sensor_msgs/LaserScan.h>
+#include <geometry_msgs/PoseStamped.h>
 #include <rosbag/bag.h>
 
 #include <termios.h>
+#include <Eigen3/Eigen/Dense>
+
+#include "Regulators/PIDController.h"
+#include "Regulators/KalmanFilter.h"
 
 
+// definition of keybors keys hex codes for drone manual control
 #define KEYCODE_I 0x69
 #define KEYCODE_J 0x6a
 #define KEYCODE_L 0x6c
@@ -24,60 +30,18 @@
 #define KEYCODE_Q 0x71
 
 
-class PIDController
-{
-    public:
-
-        PIDController(double Kp, double Ki, double Kd) : m_Kp(Kp), m_Ki(Ki), m_Kd(Kd)
-                                                        , m_sum(0), m_prev(0) {}
-
-        double run(double set_point, double pv, double delta_t)
-        {
-            double err = set_point - pv;
-
-            m_sum += err;
-
-            double x_p = m_Kp * err + m_Ki * (m_sum) * delta_t + m_Kd * (err - m_prev) / delta_t;
-
-            m_prev = err;
-
-            return x_p;
-        }
-
-        void update_pid_settings(std::vector<double> pidParams)
-        {
-            m_Kp = pidParams[0];
-            m_Ki = pidParams[1];
-            m_Kd = pidParams[2];
-        }
-
-        std::vector<double> get_params()
-        {
-            return {m_Kp, m_Ki, m_Kd};
-        }
-
-        double m_sum;
-        double m_prev;
-    
-    private:
-
-        double m_Kp;
-        double m_Ki;
-        double m_Kd;
-        
-};
-
 
 class UavControl
 {
     public:
         
-        // TODO: Chose right Kp, Ki and Kd for PIDs
         UavControl() : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0)
         {
             state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 10, &UavControl::state_cb, this);
             droneLand_sub = nh.subscribe<ros_landing::droneLand>("/droneLand", 10, &UavControl::droneLand_cb, this);
             lidar_sub = nh.subscribe<sensor_msgs::LaserScan>("/laser/scan", 10, &UavControl::lidar_cb, this);
+            drone_actual_pose = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, &UavControl::pose_cb, this);
+
             cmd_vel_pub = nh.advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 10);
             arming_client = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
             set_mode_client = nh.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
@@ -86,11 +50,39 @@ class UavControl
             PIDy = nh.advertise<std_msgs::Float32>("PID/y", 10);
 
             bag_pid.open("pid_output.bag", rosbag::bagmode::Write);
+
+            m_actual_pose.reserve(3);
+        }
+
+        UavControl(kalman::KalmanFilter filter) : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0), kalmanFilter(filter)
+        {
+            state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 10, &UavControl::state_cb, this);
+            droneLand_sub = nh.subscribe<ros_landing::droneLand>("/droneLand", 10, &UavControl::droneLand_cb, this);
+            lidar_sub = nh.subscribe<sensor_msgs::LaserScan>("/laser/scan", 10, &UavControl::lidar_cb, this);
+            drone_actual_pose = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, &UavControl::pose_cb, this);
+
+            cmd_vel_pub = nh.advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 10);
+            arming_client = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
+            set_mode_client = nh.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
+
+            PIDx = nh.advertise<std_msgs::Float32>("PID/x", 10);
+            PIDy = nh.advertise<std_msgs::Float32>("PID/y", 10);
+
+            bag_pid.open("pid_output.bag", rosbag::bagmode::Write);
+
+            m_actual_pose.reserve(3);
         }
 
         ~UavControl()
         {
             bag_pid.close();
+        }
+
+        void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
+        {
+            m_actual_pose[0] = msg->pose.position.x;
+            m_actual_pose[1] = msg->pose.position.y;
+            m_actual_pose[2] = msg->pose.position.z;
         }
 
         void state_cb(const mavros_msgs::State::ConstPtr& msg)
@@ -208,9 +200,10 @@ class UavControl
         double m_y;
         double m_ang;
         double m_lidar;
+        std::vector<double> m_actual_pose;
 
-        PIDController pid_x;
-        PIDController pid_y;
+        pid::PIDController pid_x;
+        pid::PIDController pid_y;
     
     private:
 
@@ -218,6 +211,7 @@ class UavControl
         ros::Subscriber state_sub;
         ros::Subscriber droneLand_sub;
         ros::Subscriber lidar_sub;
+        ros::Subscriber drone_actual_pose;
         ros::Publisher local_pos_pub;
         ros::Publisher cmd_vel_pub;
         ros::ServiceClient arming_client;
@@ -230,12 +224,27 @@ class UavControl
         ros::Publisher PIDy;
 
         rosbag::Bag bag_pid;
+
+        kalman::KalmanFilter kalmanFilter;
 };
 
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "offb_node");
 
+    // matrices for kalman filter
+    Eigen::Matrix<double, 4, 4> A{{1, 0, 0.5, 0}, {0, 1, 0, 0.5}, {0, 0, 1, 0}, {0, 0, 0, 1}};
+    Eigen::Matrix<double, 4, 1> B; B.setZero();
+    Eigen::Matrix<double, 2, 4> C{{1, 0, 0, 0}, {0, 1, 0, 0}};
+    Eigen::Matrix<double, 4, 4> Q{{0.01, 0, 0, 0}, {0, 0.01, 0, 0}, {0, 0, 0.01, 0}, {0, 0, 0, 0.01}}; // TODO: find out how to calculate this matrix
+    Eigen::Matrix<double, 1, 1> R; R.setZero();
+    Eigen::Matrix<double, 4, 4> P0{{0.0625, 0, 0, 0}, {0, 0.0625, 0, 0}, {0, 0, 0.0625, 0}, {0, 0, 0, 0.0625}}; // TODO: find out how to calculate this matrix
+    Eigen::Matrix<double, 4, 1> x0{{0}, {0}, {0.1}, {0.1}};
+
+    // Kalman Filter initialization
+    kalman::KalmanFilter filter(A, B, C, Q, R, P0, x0);
+
+    // UavControl initialization
     UavControl uav;
 
     // PID parameters

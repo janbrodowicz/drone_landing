@@ -65,6 +65,8 @@
   <exec_depend>message_filters</exec_depend>
   <build_depend>rosbag</build_depend>
   <exec_depend>rosbag</exec_depend>
+  <build_depend>eigen</build_depend>
+  <exec_depend>eigen</exec_depend>
 
   <build_depend>message_generation</build_depend>
   <exec_depend>message_runtime</exec_depend>

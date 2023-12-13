@@ -4,7 +4,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/pid_output_landing_P.bag")
+# b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/pid_output_landing_P.bag")
+# b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/pid_P_output.bag")
+# b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/pid_PI_output.bag")
+# b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/pid_PID_output.bag")
+b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/pid_kryt_output.bag")
 PID_X = b.message_by_topic("pid_x")
 PID_Y = b.message_by_topic("pid_y")
 
@@ -13,12 +17,12 @@ df_pid_y = pd.read_csv(PID_Y)
 # print(df_pid_x[df_pid_x['Time']>3481])
 
 # Below figure is done for PID output with critical gain
-# fig, ax = plt.subplots(2)
-# ax[0].plot(df_pid_x["Time"][16:].tolist(), df_pid_x["data"][16:].tolist())
-# ax[0].grid()
-# ax[1].plot(df_pid_y["Time"][16:].tolist(), df_pid_y["data"][16:].tolist())
-# ax[1].grid()
-# plt.show()
+fig, ax = plt.subplots(2)
+ax[0].plot(df_pid_x["Time"][16:].tolist(), df_pid_x["data"][16:].tolist())
+ax[0].grid()
+ax[1].plot(df_pid_y["Time"][16:].tolist(), df_pid_y["data"][16:].tolist())
+ax[1].grid()
+plt.show()
 
 # Below figure is done for PID type P after Ziegler-Nichols method
 # fig, ax = plt.subplots(2)

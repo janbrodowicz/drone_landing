@@ -16,6 +16,7 @@ find_package(catkin REQUIRED
 )
 
 find_package(OpenCV 4 REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 ################################################
 ## Declare ROS messages, services and actions ##
@@ -79,6 +80,7 @@ include_directories(
     include
     ${catkin_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
+    ${EIGEN_INCLUDE_DIRS}
 )
 
 add_library(altitudeProcessing src/VisionProcessing/AltitudeDataProcessing.cpp src/VisionProcessing/AltitudeDataProcessingBase.cpp)
@@ -90,8 +92,14 @@ target_link_libraries(frameProcessing ${OpenCV_LIBS})
 add_library(objectProcessing src/VisionProcessing/ObjectParameterAnalysis.cpp)
 target_link_libraries(objectProcessing ${OpenCV_LIBS})
 
+add_library(pidController src/Regulators/PIDController.cpp)
+# target_link_libraries(pidController ${Eigen_LIBRARIES})
+
+add_library(kalmanFilter src/Regulators/KalmanFilter.cpp)
+target_link_libraries(kalmanFilter ${Eigen_LIBRARIES})
+
 add_executable(${PROJECT_NAME}_control_node src/uav_control.cpp)
-target_link_libraries(${PROJECT_NAME}_control_node ${catkin_LIBRARIES})
+target_link_libraries(${PROJECT_NAME}_control_node pidController kalmanFilter ${catkin_LIBRARIES})
 
 add_executable(${PROJECT_NAME}_vision_processing src/vision_processing.cpp)
 target_link_libraries(${PROJECT_NAME}_vision_processing frameProcessing objectProcessing altitudeProcessing ${catkin_LIBRARIES} ${OpenCV_LIBS})
