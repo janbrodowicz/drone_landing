@@ -50,6 +50,7 @@ class UavControl
             PIDy = nh.advertise<std_msgs::Float32>("PID/y", 10);
 
             bag_pid.open("pid_output.bag", rosbag::bagmode::Write);
+            bag_kalman.open("kalman_output.bag", rosbag::bagmode::Write);
 
             m_actual_pose.reserve(3);
         }
@@ -69,6 +70,7 @@ class UavControl
             PIDy = nh.advertise<std_msgs::Float32>("PID/y", 10);
 
             bag_pid.open("pid_output.bag", rosbag::bagmode::Write);
+            bag_kalman.open("kalman_output.bag", rosbag::bagmode::Write);
 
             m_actual_pose.reserve(3);
         }
@@ -76,6 +78,7 @@ class UavControl
         ~UavControl()
         {
             bag_pid.close();
+            bag_kalman.close();
         }
 
         void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
@@ -108,6 +111,40 @@ class UavControl
                 m_x = msg->X / 100.0;
                 m_y = msg->Y / 100.0;
 
+                //================================================================================
+                //================================================================================
+
+                // KALMAN FILTER OPERATIONS
+
+                //================================================================================
+                //================================================================================
+
+                // update of A and Q matrices
+                kalmanFilter.update_AQmatrix(delta_t);
+
+                // create matrix for estimation output
+                Eigen::Matrix<double, 4, 1> kalman_out;
+
+                // setting input to the system to 0
+                Eigen::Matrix<double, 4, 1> input; input.setZero();
+
+                // kalman prediction step
+                kalman_out = kalmanFilter.predictEstimate(input);
+
+                // creating vector for measurement
+                Eigen::Vector2d measurement(m_x, m_y);
+
+                // kalman update step
+                kalmanFilter.updateEstimate(measurement);
+
+                //================================================================================
+                //================================================================================
+
+                // PID OPERATIONS
+
+                //================================================================================
+                //================================================================================
+
                 m_x_pid = pid_x.run(0, m_x, delta_t);
                 m_y_pid = pid_y.run(0, m_y, delta_t);
 
@@ -117,11 +154,37 @@ class UavControl
                 x_msg.data = m_x_pid;
                 y_msg.data = m_y_pid;
 
+                // kalman output to ros msgs
+                std_msgs::Float32 x_estimate;
+                std_msgs::Float32 y_estimate;
+                x_estimate.data = kalman_out(0);
+                y_estimate.data = kalman_out(1);
+
+                // actual pose to ros msgs
+                std_msgs::Float32 x_actual;
+                std_msgs::Float32 y_actual;
+                x_actual.data = m_actual_pose[0];
+                y_actual.data = m_actual_pose[1];
+
+                // measurement to ros msgs
+                std_msgs::Float32 x_measure;
+                std_msgs::Float32 y_measure;
+                x_measure.data = m_x;
+                y_measure.data = m_y;
+
+
                 // write data to a bag file
                 if(m_landing)
                 {
                     bag_pid.write("pid_x", ros::Time::now(), x_msg);
                     bag_pid.write("pid_y", ros::Time::now(), y_msg);
+
+                    bag_kalman.write("estimate_x", ros::Time::now(), x_estimate);
+                    bag_kalman.write("estimate_y", ros::Time::now(), y_estimate);
+                    bag_kalman.write("measurement_x", ros::Time::now(), x_measure);
+                    bag_kalman.write("measurement_y", ros::Time::now(), y_measure);
+                    bag_kalman.write("actual_x", ros::Time::now(), x_actual);
+                    bag_kalman.write("actual_y", ros::Time::now(), y_actual);
                 }
 
                 PIDx.publish(x_msg);
@@ -224,6 +287,7 @@ class UavControl
         ros::Publisher PIDy;
 
         rosbag::Bag bag_pid;
+        rosbag::Bag bag_kalman;
 
         kalman::KalmanFilter kalmanFilter;
 };
@@ -232,20 +296,62 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "offb_node");
 
-    // matrices for kalman filter
-    Eigen::Matrix<double, 4, 4> A{{1, 0, 0.5, 0}, {0, 1, 0, 0.5}, {0, 0, 1, 0}, {0, 0, 0, 1}};
-    Eigen::Matrix<double, 4, 1> B; B.setZero();
-    Eigen::Matrix<double, 2, 4> C{{1, 0, 0, 0}, {0, 1, 0, 0}};
-    Eigen::Matrix<double, 4, 4> Q{{0.01, 0, 0, 0}, {0, 0.01, 0, 0}, {0, 0, 0.01, 0}, {0, 0, 0, 0.01}}; // TODO: find out how to calculate this matrix
-    Eigen::Matrix<double, 1, 1> R; R.setZero();
-    Eigen::Matrix<double, 4, 4> P0{{0.0625, 0, 0, 0}, {0, 0.0625, 0, 0}, {0, 0, 0.0625, 0}, {0, 0, 0, 0.0625}}; // TODO: find out how to calculate this matrix
-    Eigen::Matrix<double, 4, 1> x0{{0}, {0}, {0.1}, {0.1}};
+    //================================================================================
+    //================================================================================
+
+    // KALMAN FILTER INITIALIZATION
+
+    //================================================================================
+    //================================================================================
+
+    Eigen::Matrix<double, 4, 4> A{{1, 0, 0.5, 0},
+                                  {0, 1, 0, 0.5},
+                                  {0, 0, 1, 0},
+                                  {0, 0, 0, 1}};
+
+    // control matrix
+    Eigen::Matrix<double, 4, 4> B; B.setZero();
+
+    // observation matrix
+    Eigen::Matrix<double, 2, 4> C{{1, 0, 0, 0},
+                                  {0, 1, 0, 0}};
+
+    // process noise vector
+    Eigen::Vector2d w(0.01, 0.01); 
+
+    // first assupmption is that sampling time is 0.5s (during operation it'll be updated)
+    Eigen::Matrix<double, 4, 4> Q{{0.0156 * w(0), 0, 0.0416 * w(0), 0},
+                                  {0, 0.0156 * w(1), 0, 0.0416 * w(1)},
+                                  {0.0416 * w(0), 0, 0.25 * w(0), 0},
+                                  {0, 0.0416 * w(1), 0, 0.25 * w(1)}}; 
+    
+    // measurement covariance matrix (measurement noise)
+    Eigen::Matrix<double, 2, 2> R{{0.0001, 0},
+                                  {0, 0.0001}}; 
+
+    // initial estimate covariance (guess)
+    Eigen::Matrix<double, 4, 4> P0{{0.1, 0, 0, 0},
+                                   {0, 0.1, 0, 0},
+                                   {0, 0, 0.1, 0},
+                                   {0, 0, 0, 0.1}}; // TODO: find out how to calculate this matrix
+
+    // initial state vector (guess)
+    Eigen::Matrix<double, 4, 1> x0{{0}, {0}, {0.01}, {0.01}};
 
     // Kalman Filter initialization
-    kalman::KalmanFilter filter(A, B, C, Q, R, P0, x0);
+    kalman::KalmanFilter kalmanFilter(A, B, C, Q, R, w, P0, x0);
+
+
+    //================================================================================
+    //================================================================================
+
+    // NODE OPERATIONS INITIALIZATION
+
+    //================================================================================
+    //================================================================================
 
     // UavControl initialization
-    UavControl uav;
+    UavControl uav(kalmanFilter);
 
     // PID parameters
     std::vector<double> PidParams = {1, 0, 0};
@@ -416,11 +522,11 @@ int main(int argc, char **argv)
             pos.velocity.z = 0;
 
             // if distances on X and Y from center of the landing pad is less than 10cm and altitude is more than 1cm
-            if(std::abs(uav.m_x) <= 0.1 && std::abs(uav.m_y) <= 0.1 && uav.m_lidar > 0.1)
-            {
-                // lower the altitude (by velocity)
-                pos.velocity.z = -0.1;
-            }
+            // if(std::abs(uav.m_x) <= 0.1 && std::abs(uav.m_y) <= 0.1 && uav.m_lidar > 0.1)
+            // {
+            //     // lower the altitude (by velocity)
+            //     pos.velocity.z = -0.1;
+            // }
 
             ROS_INFO("PID output: X: %f, Y: %f", uav.m_x, uav.m_y);
         }
