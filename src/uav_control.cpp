@@ -6,7 +6,9 @@
 #include <ros_landing/droneLand.h>
 #include <std_msgs/Float32.h>
 #include <sensor_msgs/LaserScan.h>
+#include <sensor_msgs/Imu.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/TwistStamped.h>
 #include <rosbag/bag.h>
 
 #include <termios.h>
@@ -30,17 +32,19 @@
 #define KEYCODE_Q 0x71
 
 
-
+template<int State, int Input, int Measure>
 class UavControl
 {
     public:
         
-        UavControl() : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0)
+        UavControl() : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0), is_first_done(false)
         {
             state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 10, &UavControl::state_cb, this);
             droneLand_sub = nh.subscribe<ros_landing::droneLand>("/droneLand", 10, &UavControl::droneLand_cb, this);
             lidar_sub = nh.subscribe<sensor_msgs::LaserScan>("/laser/scan", 10, &UavControl::lidar_cb, this);
             drone_actual_pose = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, &UavControl::pose_cb, this);
+            drone_velocity = nh.subscribe<geometry_msgs::TwistStamped>("mavros/local_position/velocity_body", 10, &UavControl::velocity_cb, this);
+            drone_accel = nh.subscribe<sensor_msgs::Imu>("mavros/imu/data_raw", 10, &UavControl::accel_cb, this);
 
             cmd_vel_pub = nh.advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 10);
             arming_client = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
@@ -53,14 +57,18 @@ class UavControl
             bag_kalman.open("kalman_output.bag", rosbag::bagmode::Write);
 
             m_actual_pose.reserve(3);
+            m_velocity.reserve(3);
+            m_accel.reserve(3);
         }
 
-        UavControl(kalman::KalmanFilter filter) : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0), kalmanFilter(filter)
+        UavControl(kalman::KalmanFilter<State, Input, Measure> filter) : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0), kalmanFilter(filter), is_first_done(false)
         {
             state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 10, &UavControl::state_cb, this);
             droneLand_sub = nh.subscribe<ros_landing::droneLand>("/droneLand", 10, &UavControl::droneLand_cb, this);
             lidar_sub = nh.subscribe<sensor_msgs::LaserScan>("/laser/scan", 10, &UavControl::lidar_cb, this);
             drone_actual_pose = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, &UavControl::pose_cb, this);
+            drone_velocity = nh.subscribe<geometry_msgs::TwistStamped>("mavros/local_position/velocity_body", 10, &UavControl::velocity_cb, this);
+            drone_accel = nh.subscribe<sensor_msgs::Imu>("mavros/imu/data_raw", 10, &UavControl::accel_cb, this);
 
             cmd_vel_pub = nh.advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 10);
             arming_client = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
@@ -73,6 +81,8 @@ class UavControl
             bag_kalman.open("kalman_output.bag", rosbag::bagmode::Write);
 
             m_actual_pose.reserve(3);
+            m_velocity.reserve(3);
+            m_accel.reserve(3);
         }
 
         ~UavControl()
@@ -86,6 +96,20 @@ class UavControl
             m_actual_pose[0] = msg->pose.position.x;
             m_actual_pose[1] = msg->pose.position.y;
             m_actual_pose[2] = msg->pose.position.z;
+        }
+
+        void velocity_cb(const geometry_msgs::TwistStamped::ConstPtr& msg)
+        {
+            m_velocity[0] = msg->twist.linear.x;
+            m_velocity[1] = msg->twist.linear.y;
+            m_velocity[2] = msg->twist.linear.z;
+        }
+
+        void accel_cb(const sensor_msgs::Imu::ConstPtr& msg)
+        {
+            m_accel[0] = msg->linear_acceleration.x;
+            m_accel[1] = msg->linear_acceleration.y;
+            m_accel[2] = msg->linear_acceleration.z;
         }
 
         void state_cb(const mavros_msgs::State::ConstPtr& msg)
@@ -120,19 +144,22 @@ class UavControl
                 //================================================================================
 
                 // update of A and Q matrices
-                kalmanFilter.update_AQmatrix(delta_t);
+                if(is_first_done)
+                {
+                    kalmanFilter.update_AQmatrix(delta_t);
+                }
 
                 // create matrix for estimation output
-                Eigen::Matrix<double, 4, 1> kalman_out;
+                Eigen::Matrix<double, 6, 1> kalman_out;
 
-                // setting input to the system to 0
-                Eigen::Matrix<double, 4, 1> input; input.setZero();
+                // setting input to the system to 0.1 (process noise)
+                Eigen::Matrix<double, 6, 1> input{{0.1}, {0.01}, {0.01}, {0.01}, {0.01}, {0.01}};
 
                 // kalman prediction step
                 kalman_out = kalmanFilter.predictEstimate(input);
 
                 // creating vector for measurement
-                Eigen::Vector2d measurement(m_x, m_y);
+                Eigen::Matrix<double, 6, 1> measurement{{m_x}, {m_y}, {m_velocity[1]}, {m_velocity[0]}, {m_accel[1]}, {m_accel[0]}};
 
                 // kalman update step
                 kalmanFilter.updateEstimate(measurement);
@@ -192,6 +219,8 @@ class UavControl
             }
             
             time_now = ros::Time::now();
+
+            is_first_done = true;
         }
 
         void set_velocity(mavros_msgs::PositionTarget pos)
@@ -264,9 +293,13 @@ class UavControl
         double m_ang;
         double m_lidar;
         std::vector<double> m_actual_pose;
+        std::vector<double> m_velocity;
+        std::vector<double> m_accel;
 
         pid::PIDController pid_x;
         pid::PIDController pid_y;
+
+        kalman::KalmanFilter<State, Input, Measure> kalmanFilter;
     
     private:
 
@@ -275,6 +308,8 @@ class UavControl
         ros::Subscriber droneLand_sub;
         ros::Subscriber lidar_sub;
         ros::Subscriber drone_actual_pose;
+        ros::Subscriber drone_velocity;
+        ros::Subscriber drone_accel;
         ros::Publisher local_pos_pub;
         ros::Publisher cmd_vel_pub;
         ros::ServiceClient arming_client;
@@ -289,7 +324,7 @@ class UavControl
         rosbag::Bag bag_pid;
         rosbag::Bag bag_kalman;
 
-        kalman::KalmanFilter kalmanFilter;
+        bool is_first_done;
 };
 
 int main(int argc, char **argv)
@@ -304,42 +339,67 @@ int main(int argc, char **argv)
     //================================================================================
     //================================================================================
 
-    Eigen::Matrix<double, 4, 4> A{{1, 0, 0.5, 0},
-                                  {0, 1, 0, 0.5},
-                                  {0, 0, 1, 0},
-                                  {0, 0, 0, 1}};
+    Eigen::Matrix<double, 6, 6> A{{1, 0, 0.5, 0, 0.125, 0},
+                                  {0, 1, 0, 0.5, 0, 0.125},
+                                  {0, 0, 1, 0, 0.5, 0},
+                                  {0, 0, 0, 1, 0, 0.5},
+                                  {0, 0, 0, 0, 1, 0},
+                                  {0, 0, 0, 0, 0, 1}};
 
-    // control matrix
-    Eigen::Matrix<double, 4, 4> B; B.setZero();
+    // control matrix; first assupmption is that sampling time is 0.5s (during operation it'll be updated)
+    Eigen::Matrix<double, 6, 6> B{{0.041, 0, 0, 0, 0, 0},
+                                  {0, 0.041, 0, 0, 0, 0},
+                                  {0, 0, 0.125, 0, 0, 0},
+                                  {0, 0, 0, 0.125, 0, 0},
+                                  {0, 0, 0, 0, 0.5, 0},
+                                  {0, 0, 0, 0, 0, 0.5}};
 
     // observation matrix
-    Eigen::Matrix<double, 2, 4> C{{1, 0, 0, 0},
-                                  {0, 1, 0, 0}};
+    Eigen::Matrix<double, 6, 6> C{{1, 0, 0, 0, 0, 0},
+                                  {0, 1, 0, 0, 0, 0},
+                                  {0, 0, 1, 0, 0, 0},
+                                  {0, 0, 0, 1, 0, 0},
+                                  {0, 0, 0, 0, 1, 0},
+                                  {0, 0, 0, 0, 0, 1}};
 
-    // process noise vector
-    Eigen::Vector2d w(0.01, 0.01); 
+    // process noise variance vector
+    Eigen::Vector2d w(0.0001, 0.0001); 
 
     // first assupmption is that sampling time is 0.5s (during operation it'll be updated)
-    Eigen::Matrix<double, 4, 4> Q{{0.0156 * w(0), 0, 0.0416 * w(0), 0},
-                                  {0, 0.0156 * w(1), 0, 0.0416 * w(1)},
-                                  {0.0416 * w(0), 0, 0.25 * w(0), 0},
-                                  {0, 0.0416 * w(1), 0, 0.25 * w(1)}}; 
+    // Eigen::Matrix<double, 4, 4> Q{{0.0156 * w(0), 0, 0.0416 * w(0), 0},
+    //                               {0, 0.0156 * w(1), 0, 0.0416 * w(1)},
+    //                               {0.0416 * w(0), 0, 0.25 * w(0), 0},
+    //                               {0, 0.0416 * w(1), 0, 0.25 * w(1)}}; 
+
+    Eigen::Matrix<double, 6, 6> Q{{0.0017 * w(0), 0, 0.0052 * w(0), 0, 0.0208 * w(0), 0},
+                                  {0, 0.0017 * w(1), 0, 0.0052 * w(1), 0, 0.0208 * w(1)},
+                                  {0.0052 * w(0), 0, 0.0156 * w(0), 0, 0.0625 * w(0), 0},
+                                  {0, 0.0052 * w(1), 0, 0.0156 * w(1), 0, 0.0625 * w(1)},
+                                  {0.0208 * w(0), 0, 0.0625 * w(0), 0, 0.25 * w(0), 0},
+                                  {0, 0.0208 * w(1), 0, 0.0625 * w(1), 0, 0.25 * w(1)}}; 
     
     // measurement covariance matrix (measurement noise)
-    Eigen::Matrix<double, 2, 2> R{{0.0001, 0},
-                                  {0, 0.0001}}; 
+    Eigen::Matrix<double, 6, 6> R{{0.001, 0, 0, 0, 0, 0},
+                                  {0, 0.001, 0, 0, 0, 0},
+                                  {0, 0, 0.001, 0, 0, 0},
+                                  {0, 0, 0, 0.001, 0, 0},
+                                  {0, 0, 0, 0, 0.001, 0},
+                                  {0, 0, 0, 0, 0, 0.001}}; // TODO: can try to calculate mean square error of 
+                                                            // measurements and use it for the measurement noise
 
     // initial estimate covariance (guess)
-    Eigen::Matrix<double, 4, 4> P0{{0.1, 0, 0, 0},
-                                   {0, 0.1, 0, 0},
-                                   {0, 0, 0.1, 0},
-                                   {0, 0, 0, 0.1}}; // TODO: find out how to calculate this matrix
+    Eigen::Matrix<double, 6, 6> P0{{0.05, 0, 0, 0, 0, 0},
+                                   {0, 0.05, 0, 0, 0, 0},
+                                   {0, 0, 0.05, 0, 0, 0},
+                                   {0, 0, 0, 0.05, 0, 0},
+                                   {0, 0, 0, 0, 0.05, 0},
+                                   {0, 0, 0, 0, 0, 0.05}}; // TODO: find out how to calculate this matrix
 
     // initial state vector (guess)
-    Eigen::Matrix<double, 4, 1> x0{{0}, {0}, {0.01}, {0.01}};
+    Eigen::Matrix<double, 6, 1> x0{{0}, {0}, {0}, {0}, {0.01}, {0.01}};
 
     // Kalman Filter initialization
-    kalman::KalmanFilter kalmanFilter(A, B, C, Q, R, w, P0, x0);
+    kalman::KalmanFilter<6, 6, 6> kalmanFilter(A, B, C, Q, R, w, P0, x0);
 
 
     //================================================================================
@@ -351,7 +411,7 @@ int main(int argc, char **argv)
     //================================================================================
 
     // UavControl initialization
-    UavControl uav(kalmanFilter);
+    UavControl<6, 6, 6> uav(kalmanFilter);
 
     // PID parameters
     std::vector<double> PidParams = {1, 0, 0};
@@ -508,6 +568,7 @@ int main(int argc, char **argv)
                 uav.pid_y.m_sum = 0;
                 uav.pid_x.m_prev = 0;
                 uav.pid_y.m_prev = 0;
+                uav.kalmanFilter.resetKalman();
                 break;
 			default:
 				break;				

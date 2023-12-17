@@ -62,7 +62,10 @@ import pandas as pd
 
 #===========================================================================
 
-b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/kalman_output_0.01_0.1_fixedbag.bag")
+# b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/kalman_output_0.01_0.1_fixedbag.bag")
+# b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_CV_with_vel_measure/kalman_output_wrong_topic.bag")
+# b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_CV_without_vel_measure/kalman_output_with_noise_2(input=0.01, noise=0.0001).bag")
+b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_CA/kalman_output_(init_acc=0.01, P0=0.05).bag")
 
 x_estimate = b.message_by_topic("estimate_x")
 y_estimate = b.message_by_topic("estimate_y")
@@ -70,6 +73,13 @@ x_measurement = b.message_by_topic("measurement_x")
 y_measurement = b.message_by_topic("measurement_y")
 x_actual = b.message_by_topic("actual_x")
 y_actual = b.message_by_topic("actual_y")
+
+# x_estimate = b.message_by_topic("x_estimate")
+# y_estimate = b.message_by_topic("y_estimate")
+# x_measurement = b.message_by_topic("x_measurement")
+# y_measurement = b.message_by_topic("y_measurement")
+# x_actual = b.message_by_topic("x_actual")
+# y_actual = b.message_by_topic("y_actual")
 
 df_x_estimate = pd.read_csv(x_estimate)
 df_y_estimate = pd.read_csv(y_estimate)
@@ -82,13 +92,13 @@ df_x_actual["data"] = df_x_actual["data"] * (-1)
 # print(df_x_estimate)
 
 fig, ax = plt.subplots(2)
-ax[0].plot(df_x_estimate["Time"].tolist(), df_x_estimate["data"].tolist(), 'o-', markersize=2.5)
-ax[0].plot(df_x_measurement["Time"].tolist(), df_x_measurement["data"].tolist())
+ax[0].plot(df_x_estimate["Time"].tolist(), df_x_estimate["data"].tolist(), 'o-', markersize=2.2)
+ax[0].plot(df_x_measurement["Time"].tolist(), df_x_measurement["data"].tolist(), 'k')
 ax[0].plot(df_x_actual["Time"].tolist(), df_x_actual["data"].tolist())
 ax[0].legend(["estimate", "measure", "actual"])
 ax[0].grid()
-ax[1].plot(df_y_estimate["Time"].tolist(), df_y_estimate["data"].tolist(), 'o-', markersize=2.5)
-ax[1].plot(df_y_measurement["Time"].tolist(), df_y_measurement["data"].tolist())
+ax[1].plot(df_y_estimate["Time"].tolist(), df_y_estimate["data"].tolist(), 'o-', markersize=2.2)
+ax[1].plot(df_y_measurement["Time"].tolist(), df_y_measurement["data"].tolist(), 'k')
 ax[1].plot(df_y_actual["Time"].tolist(), df_y_actual["data"].tolist())
 ax[1].legend(["estimate", "measure", "actual"])
 ax[1].grid()
