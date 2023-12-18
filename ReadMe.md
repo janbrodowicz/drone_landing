@@ -27,11 +27,13 @@
 5. Open new terminal; run command: `rosrun ros_landing ros_landing_control_node` (node for drone control):
 	a) This node allows you to control the drone manually with keyboard keys by sending velocity commands:
 		
-		   	      | q    u    i    |
-		   	      ------------------
-			      |   d    j  k  l |
-			      ------------------
-			      | z  x  c  v     |
+		   	| q    u    i    |     i, j, k, l  --  just like keyboard arrows (^, <, \/, >)
+		   	------------------
+			|   d    j  k  l |	q  --  resets velocities;  u, d  --  up and down;  z, x  --  control yaw position
+			------------------
+			| z  x  c  v     |	c, v  --  start, stop automatic landing procedure
+	
+	b) If the landing pad is being detected and you press "c" button automatic landing starts and you cannot control the drone manually 		   until you press "v" button
 
 ### Solving issues
 
