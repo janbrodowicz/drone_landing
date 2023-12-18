@@ -15,12 +15,23 @@
           <frameName>/lidar_sensor_link</frameName>
         </plugin>
         
+6. Download Eigen library for C++ (https://eigen.tuxfamily.org/index.php?title=Main_Page), preferably 3.4.0
+        
 
 ### Launching steps
 
 1. Go to ~/workspace_dir and build the workspace; command: `catkin build`
 2. Go to ~/workspace_dir/src/ros_landing/ and run eviroment_vars.sh; command: `. ./enviroment_vars.sh` (open the file 	before and check if the paths match with yours)
 3. Run the siumulation; command: `roslaunch ros_landing ros_landing_launch.launch`
+4. Open new terminal; run command: `rosrun ros_landing ros_landing_vision_processing` (node for detecting landing pad)
+5. Open new terminal; run command: `rosrun ros_landing ros_landing_control_node` (node for drone control):
+	a) This node allows you to control the drone manually with keyboard keys by sending velocity commands:
+		
+		   	      | q    u    i    |
+		   	      ------------------
+			      |   d    j  k  l |
+			      ------------------
+			      | z  x  c  v     |
 
 ### Solving issues
 
