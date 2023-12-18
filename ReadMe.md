@@ -34,6 +34,7 @@
 			| z  x  c  v     |	c, v  --  start, stop automatic landing procedure
 	
 	b) If the landing pad is being detected and you press "c" button automatic landing starts and you cannot control the drone manually 		   until you press "v" button
+6. Parameters of the PID controller used in automatic landing are set to: Kp=1, Ki=0, Kd=0 by default. You can change them while the node is working by opening a new terminal and sending this command: `rosparam set "/pidParams" "[Kp, Ki, Kd]"`, where Kp, Ki and Kd are the PID parameters.
 
 ### Solving issues
 
