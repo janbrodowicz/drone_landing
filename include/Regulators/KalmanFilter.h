@@ -11,8 +11,8 @@ namespace kalman
             KalmanFilter(){};
 
             KalmanFilter(Eigen::Matrix<double, State, State> A_in, Eigen::Matrix<double, State, Input> B_in, Eigen::Matrix<double, Measure, State> C_in,
-                         Eigen::Matrix<double, State, State> Q_in, Eigen::Matrix<double, Measure, Measure> R_in, Eigen::Matrix<double, 2, 1> w_in,
-                         Eigen::Matrix<double, State, State> P0_in, Eigen::Matrix<double, State, 1> x0_in);
+                         Eigen::Matrix<double, State, 1> G_in, Eigen::Matrix<double, State, State> Q_in, Eigen::Matrix<double, Measure, Measure> R_in, 
+                         Eigen::Matrix<double, 2, 1> w_in, Eigen::Matrix<double, State, State> P0_in, Eigen::Matrix<double, State, 1> x0_in);
 
             KalmanFilter(const KalmanFilter<State, Input, Measure>& filter);
 
@@ -34,6 +34,7 @@ namespace kalman
             Eigen::Matrix<double, State, State> m_A; 
             Eigen::Matrix<double, State, Input> m_B;
             Eigen::Matrix<double, Measure, State> m_C;
+            Eigen::Matrix<double, State, 1> m_G;
             Eigen::Matrix<double, State, State> m_Q;
             Eigen::Matrix<double, Measure, Measure> m_R;
             Eigen::Matrix<double, State, State> m_P0;

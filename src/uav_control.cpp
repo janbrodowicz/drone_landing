@@ -37,7 +37,7 @@ class UavControl
 {
     public:
         
-        UavControl() : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0), is_first_done(false)
+        UavControl() : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0), m_x_pid(0), m_y_pid(0)
         {
             state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 10, &UavControl::state_cb, this);
             droneLand_sub = nh.subscribe<ros_landing::droneLand>("/droneLand", 10, &UavControl::droneLand_cb, this);
@@ -61,7 +61,7 @@ class UavControl
             m_accel.reserve(3);
         }
 
-        UavControl(kalman::KalmanFilter<State, Input, Measure> filter) : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0), kalmanFilter(filter), is_first_done(false)
+        UavControl(kalman::KalmanFilter<State, Input, Measure> filter) : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0), kalmanFilter(filter), m_x_pid(0), m_y_pid(0)
         {
             state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 10, &UavControl::state_cb, this);
             droneLand_sub = nh.subscribe<ros_landing::droneLand>("/droneLand", 10, &UavControl::droneLand_cb, this);
@@ -135,92 +135,97 @@ class UavControl
                 m_x = msg->X / 100.0;
                 m_y = msg->Y / 100.0;
 
-                //================================================================================
-                //================================================================================
-
-                // KALMAN FILTER OPERATIONS
-
-                //================================================================================
-                //================================================================================
-
-                // update of A and Q matrices
-                if(is_first_done)
-                {
-                    kalmanFilter.update_AQmatrix(delta_t);
-                }
-
-                // create matrix for estimation output
-                Eigen::Matrix<double, 6, 1> kalman_out;
-
-                // setting input to the system to 0.1 (process noise)
-                Eigen::Matrix<double, 6, 1> input{{0.1}, {0.01}, {0.01}, {0.01}, {0.01}, {0.01}};
-
-                // kalman prediction step
-                kalman_out = kalmanFilter.predictEstimate(input);
-
-                // creating vector for measurement
-                Eigen::Matrix<double, 6, 1> measurement{{m_x}, {m_y}, {m_velocity[1]}, {m_velocity[0]}, {m_accel[1]}, {m_accel[0]}};
-
-                // kalman update step
-                kalmanFilter.updateEstimate(measurement);
-
-                //================================================================================
-                //================================================================================
-
-                // PID OPERATIONS
-
-                //================================================================================
-                //================================================================================
-
-                m_x_pid = pid_x.run(0, m_x, delta_t);
-                m_y_pid = pid_y.run(0, m_y, delta_t);
-
-                // Publishing PID output for rqt to plot
-                std_msgs::Float32 x_msg;
-                std_msgs::Float32 y_msg;
-                x_msg.data = m_x_pid;
-                y_msg.data = m_y_pid;
-
-                // kalman output to ros msgs
-                std_msgs::Float32 x_estimate;
-                std_msgs::Float32 y_estimate;
-                x_estimate.data = kalman_out(0);
-                y_estimate.data = kalman_out(1);
-
-                // actual pose to ros msgs
-                std_msgs::Float32 x_actual;
-                std_msgs::Float32 y_actual;
-                x_actual.data = m_actual_pose[0];
-                y_actual.data = m_actual_pose[1];
-
-                // measurement to ros msgs
-                std_msgs::Float32 x_measure;
-                std_msgs::Float32 y_measure;
-                x_measure.data = m_x;
-                y_measure.data = m_y;
-
-
-                // write data to a bag file
                 if(m_landing)
                 {
-                    bag_pid.write("pid_x", ros::Time::now(), x_msg);
-                    bag_pid.write("pid_y", ros::Time::now(), y_msg);
 
-                    bag_kalman.write("estimate_x", ros::Time::now(), x_estimate);
-                    bag_kalman.write("estimate_y", ros::Time::now(), y_estimate);
-                    bag_kalman.write("measurement_x", ros::Time::now(), x_measure);
-                    bag_kalman.write("measurement_y", ros::Time::now(), y_measure);
-                    bag_kalman.write("actual_x", ros::Time::now(), x_actual);
-                    bag_kalman.write("actual_y", ros::Time::now(), y_actual);
+                    //================================================================================
+                    //================================================================================
+
+                    // KALMAN FILTER OPERATIONS
+
+                    //================================================================================
+                    //================================================================================
+
+                    // update of A and Q matrices
+                    // kalmanFilter.update_AQmatrix(delta_t);
+
+                    // create matrix for estimation output
+                    // Eigen::Matrix<double, 6, 1> kalman_out;
+                    // Eigen::Matrix<double, 4, 1> kalman_out;
+                    Eigen::Matrix<double, 2, 1> kalman_out;
+
+                    // setting input to the system to 0.1 (process noise)
+                    // Eigen::Matrix<double, 6, 1> input{{0.1}, {0.01}, {0.01}, {0.01}, {0.01}, {0.01}};
+                    // Eigen::Matrix<double, 4, 1> input{{0.01}, {0.01}, {0.01}, {0.01}};
+                    Eigen::Matrix<double, 2, 1> input{{(-0.4) * m_y}, {(-0.4) * m_x}};
+                    // Eigen::Matrix<double, 2, 1> input{{0.001}, {0.001}};
+
+                    // kalman prediction step
+                    kalman_out = kalmanFilter.predictEstimate(input);
+
+                    // creating vector for measurement
+                    // Eigen::Matrix<double, 6, 1> measurement{{m_x}, {m_y}, {m_velocity[1]}, {m_velocity[0]}, {m_accel[1]}, {m_accel[0]}};
+                    Eigen::Matrix<double, 2, 1> measurement{{m_x}, {m_y}};
+
+                    // kalman update step
+                    kalmanFilter.updateEstimate(measurement);
+
+                    //================================================================================
+                    //================================================================================
+
+                    // PID OPERATIONS
+
+                    //================================================================================
+                    //================================================================================
+
+                    m_x_pid = pid_x.run(0, m_x, delta_t);
+                    m_y_pid = pid_y.run(0, m_y, delta_t);
+
+                    // Publishing PID output for rqt to plot
+                    std_msgs::Float32 x_msg;
+                    std_msgs::Float32 y_msg;
+                    x_msg.data = m_x_pid;
+                    y_msg.data = m_y_pid;
+
+                    // kalman output to ros msgs
+                    std_msgs::Float32 x_estimate;
+                    std_msgs::Float32 y_estimate;
+                    x_estimate.data = kalman_out(0);
+                    y_estimate.data = kalman_out(1);
+
+                    // actual pose to ros msgs
+                    std_msgs::Float32 x_actual;
+                    std_msgs::Float32 y_actual;
+                    x_actual.data = m_actual_pose[0];
+                    y_actual.data = m_actual_pose[1];
+
+                    // measurement to ros msgs
+                    std_msgs::Float32 x_measure;
+                    std_msgs::Float32 y_measure;
+                    x_measure.data = m_x;
+                    y_measure.data = m_y;
+
+
+                    // write data to a bag file
+                    if(m_landing)
+                    {
+                        bag_pid.write("pid_x", ros::Time::now(), x_msg);
+                        bag_pid.write("pid_y", ros::Time::now(), y_msg);
+
+                        bag_kalman.write("estimate_x", ros::Time::now(), x_estimate);
+                        bag_kalman.write("estimate_y", ros::Time::now(), y_estimate);
+                        bag_kalman.write("measurement_x", ros::Time::now(), x_measure);
+                        bag_kalman.write("measurement_y", ros::Time::now(), y_measure);
+                        bag_kalman.write("actual_x", ros::Time::now(), x_actual);
+                        bag_kalman.write("actual_y", ros::Time::now(), y_actual);
+                    }
+
+                    PIDx.publish(x_msg);
+                    PIDy.publish(y_msg);
                 }
-
-                PIDx.publish(x_msg);
-                PIDy.publish(y_msg);
             }
             
             time_now = ros::Time::now();
-
-            is_first_done = true;
         }
 
         void set_velocity(mavros_msgs::PositionTarget pos)
@@ -323,9 +328,8 @@ class UavControl
 
         rosbag::Bag bag_pid;
         rosbag::Bag bag_kalman;
-
-        bool is_first_done;
 };
+     
 
 int main(int argc, char **argv)
 {
@@ -339,31 +343,55 @@ int main(int argc, char **argv)
     //================================================================================
     //================================================================================
 
-    Eigen::Matrix<double, 6, 6> A{{1, 0, 0.5, 0, 0.125, 0},
-                                  {0, 1, 0, 0.5, 0, 0.125},
-                                  {0, 0, 1, 0, 0.5, 0},
-                                  {0, 0, 0, 1, 0, 0.5},
-                                  {0, 0, 0, 0, 1, 0},
-                                  {0, 0, 0, 0, 0, 1}};
+    // Eigen::Matrix<double, 6, 6> A{{1, 0, 0.5, 0, 0.125, 0},
+    //                               {0, 1, 0, 0.5, 0, 0.125},
+    //                               {0, 0, 1, 0, 0.5, 0},
+    //                               {0, 0, 0, 1, 0, 0.5},
+    //                               {0, 0, 0, 0, 1, 0},
+    //                               {0, 0, 0, 0, 0, 1}};
+
+    // Eigen::Matrix<double, 4, 4> A{{1, 0, 0.5, 0},
+    //                               {0, 1, 0, 0.5},
+    //                               {0, 0, 1, 0},
+    //                               {0, 0, 0, 1}};
+
+    double h = 0.5;
+
+    Eigen::Matrix<double, 2, 2> A{{1, 0},
+                                  {0, 1}};
 
     // control matrix; first assupmption is that sampling time is 0.5s (during operation it'll be updated)
-    Eigen::Matrix<double, 6, 6> B{{0.041, 0, 0, 0, 0, 0},
-                                  {0, 0.041, 0, 0, 0, 0},
-                                  {0, 0, 0.125, 0, 0, 0},
-                                  {0, 0, 0, 0.125, 0, 0},
-                                  {0, 0, 0, 0, 0.5, 0},
-                                  {0, 0, 0, 0, 0, 0.5}};
+    // Eigen::Matrix<double, 6, 6> B{{0.041, 0, 0, 0, 0, 0},
+    //                               {0, 0.041, 0, 0, 0, 0},
+    //                               {0, 0, 0.125, 0, 0, 0},
+    //                               {0, 0, 0, 0.125, 0, 0},
+    //                               {0, 0, 0, 0, 0.5, 0},
+    //                               {0, 0, 0, 0, 0, 0.5}};
+
+    // Eigen::Matrix<double, 4, 4> B{{0.125, 0, 0, 0},
+    //                               {0, 0.125, 0, 0},
+    //                               {0, 0, 0.5, 0},
+    //                               {0, 0, 0, 0.5}};
+
+    Eigen::Matrix<double, 2, 2> B{{h, 0},
+                                  {0, h}};
 
     // observation matrix
-    Eigen::Matrix<double, 6, 6> C{{1, 0, 0, 0, 0, 0},
-                                  {0, 1, 0, 0, 0, 0},
-                                  {0, 0, 1, 0, 0, 0},
-                                  {0, 0, 0, 1, 0, 0},
-                                  {0, 0, 0, 0, 1, 0},
-                                  {0, 0, 0, 0, 0, 1}};
+    // Eigen::Matrix<double, 6, 6> C{{1, 0, 0, 0, 0, 0},
+    //                               {0, 1, 0, 0, 0, 0},
+    //                               {0, 0, 1, 0, 0, 0},
+    //                               {0, 0, 0, 1, 0, 0},
+    //                               {0, 0, 0, 0, 1, 0},
+    //                               {0, 0, 0, 0, 0, 1}};
+
+    // Eigen::Matrix<double, 2, 4> C{{1, 0, 0, 0},
+    //                               {0, 1, 0, 0}};
+
+    Eigen::Matrix<double, 2, 2> C{{1, 0},
+                                  {0, 1}};
 
     // process noise variance vector
-    Eigen::Vector2d w(0.0001, 0.0001); 
+    Eigen::Vector2d w(0, 0); 
 
     // first assupmption is that sampling time is 0.5s (during operation it'll be updated)
     // Eigen::Matrix<double, 4, 4> Q{{0.0156 * w(0), 0, 0.0416 * w(0), 0},
@@ -371,35 +399,55 @@ int main(int argc, char **argv)
     //                               {0.0416 * w(0), 0, 0.25 * w(0), 0},
     //                               {0, 0.0416 * w(1), 0, 0.25 * w(1)}}; 
 
-    Eigen::Matrix<double, 6, 6> Q{{0.0017 * w(0), 0, 0.0052 * w(0), 0, 0.0208 * w(0), 0},
-                                  {0, 0.0017 * w(1), 0, 0.0052 * w(1), 0, 0.0208 * w(1)},
-                                  {0.0052 * w(0), 0, 0.0156 * w(0), 0, 0.0625 * w(0), 0},
-                                  {0, 0.0052 * w(1), 0, 0.0156 * w(1), 0, 0.0625 * w(1)},
-                                  {0.0208 * w(0), 0, 0.0625 * w(0), 0, 0.25 * w(0), 0},
-                                  {0, 0.0208 * w(1), 0, 0.0625 * w(1), 0, 0.25 * w(1)}}; 
+    Eigen::Matrix<double, 2, 2> Q{{std::pow(h, 2) * w(0), 0},
+                                  {0, std::pow(h, 2) * w(1)}}; 
+
+    // Eigen::Matrix<double, 6, 6> Q{{0.0017 * w(0), 0, 0.0052 * w(0), 0, 0.0208 * w(0), 0},
+    //                               {0, 0.0017 * w(1), 0, 0.0052 * w(1), 0, 0.0208 * w(1)},
+    //                               {0.0052 * w(0), 0, 0.0156 * w(0), 0, 0.0625 * w(0), 0},
+    //                               {0, 0.0052 * w(1), 0, 0.0156 * w(1), 0, 0.0625 * w(1)},
+    //                               {0.0208 * w(0), 0, 0.0625 * w(0), 0, 0.25 * w(0), 0},
+    //                               {0, 0.0208 * w(1), 0, 0.0625 * w(1), 0, 0.25 * w(1)}}; 
     
     // measurement covariance matrix (measurement noise)
-    Eigen::Matrix<double, 6, 6> R{{0.001, 0, 0, 0, 0, 0},
-                                  {0, 0.001, 0, 0, 0, 0},
-                                  {0, 0, 0.001, 0, 0, 0},
-                                  {0, 0, 0, 0.001, 0, 0},
-                                  {0, 0, 0, 0, 0.001, 0},
-                                  {0, 0, 0, 0, 0, 0.001}}; // TODO: can try to calculate mean square error of 
+    // Eigen::Matrix<double, 6, 6> R{{0.1, 0, 0, 0, 0, 0},
+    //                               {0, 0.1, 0, 0, 0, 0},
+    //                               {0, 0, 0.1, 0, 0, 0},
+    //                               {0, 0, 0, 0.1, 0, 0},
+    //                               {0, 0, 0, 0, 0.1, 0},
+    //                               {0, 0, 0, 0, 0, 0.1}}; // TODO: can try to calculate mean square error of 
                                                             // measurements and use it for the measurement noise
+    
+    Eigen::Matrix<double, 2, 2> R{{0.01, 0},
+                                  {0, 0.01}};
 
     // initial estimate covariance (guess)
-    Eigen::Matrix<double, 6, 6> P0{{0.05, 0, 0, 0, 0, 0},
-                                   {0, 0.05, 0, 0, 0, 0},
-                                   {0, 0, 0.05, 0, 0, 0},
-                                   {0, 0, 0, 0.05, 0, 0},
-                                   {0, 0, 0, 0, 0.05, 0},
-                                   {0, 0, 0, 0, 0, 0.05}}; // TODO: find out how to calculate this matrix
+    // Eigen::Matrix<double, 6, 6> P0{{0.05, 0, 0, 0, 0, 0},
+    //                                {0, 0.05, 0, 0, 0, 0},
+    //                                {0, 0, 0.05, 0, 0, 0},
+    //                                {0, 0, 0, 0.05, 0, 0},
+    //                                {0, 0, 0, 0, 0.05, 0},
+    //                                {0, 0, 0, 0, 0, 0.05}}; // TODO: find out how to calculate this matrix
+
+    // Eigen::Matrix<double, 4, 4> P0{{0.1, 0, 0, 0},
+    //                                {0, 0.1, 0, 0},
+    //                                {0, 0, 0.1, 0},
+    //                                {0, 0, 0, 0.1}};
+
+    Eigen::Matrix<double, 2, 2> P0{{0.01, 0},
+                                   {0, 0.01}};
 
     // initial state vector (guess)
-    Eigen::Matrix<double, 6, 1> x0{{0}, {0}, {0}, {0}, {0.01}, {0.01}};
+    // Eigen::Matrix<double, 6, 1> x0{{0}, {0}, {0}, {0}, {0.01}, {0.01}};
+
+    // Eigen::Matrix<double, 4, 1> x0{{0}, {0}, {0.01}, {0.01}};
+
+    Eigen::Matrix<double, 2, 1> x0{{0.001}, {0.001}};
+
+    Eigen::Matrix<double, 2, 1> G{{0}, {0}};
 
     // Kalman Filter initialization
-    kalman::KalmanFilter<6, 6, 6> kalmanFilter(A, B, C, Q, R, w, P0, x0);
+    kalman::KalmanFilter<2, 2, 2> kalmanFilter(A, B, C, G, Q, R, w, P0, x0);
 
 
     //================================================================================
@@ -411,7 +459,7 @@ int main(int argc, char **argv)
     //================================================================================
 
     // UavControl initialization
-    UavControl<6, 6, 6> uav(kalmanFilter);
+    UavControl<2, 2, 2> uav(kalmanFilter);
 
     // PID parameters
     std::vector<double> PidParams = {1, 0, 0};
