@@ -84,12 +84,15 @@ void KalmanFilter<State, Input, Measure>::updateEstimate(Eigen::Matrix<double, M
 {
     // additional matrix for kalman gain calculation
     Eigen::MatrixXd Sk;
+    Eigen::MatrixXd Sk_inv;
     Sk.resize(r, r);
+    Sk_inv.resize(r, r);
     Sk = (m_C * m_covarianceApriori * m_C.transpose()) + m_R;
-    Sk.inverse();
+    Sk_inv = Sk;
+    Sk_inv.inverse();
 
     // kalman gain
-    m_kalmanGain = m_covarianceApriori * (m_C.transpose()) * Sk;
+    m_kalmanGain = m_covarianceApriori * (m_C.transpose()) * Sk_inv;
 
     // error
     m_error = measurement - (m_C * m_estimateApriori);
@@ -97,15 +100,8 @@ void KalmanFilter<State, Input, Measure>::updateEstimate(Eigen::Matrix<double, M
     // calculate posteriori estimate
     m_estimateAposteriori = m_estimateApriori + (m_kalmanGain * m_error);
 
-    // steps for posteriori covariance calculation
-    Eigen::MatrixXd I;
-    I = Eigen::MatrixXd::Identity(n, n); 
-    Eigen::MatrixXd Iminus;
-    Iminus.resize(n, n);
-    Iminus = I - (m_kalmanGain * m_C);
-
     // calculate posteriori covariance
-    m_covarianceAposteriori = (Iminus * m_covarianceApriori * (Iminus.transpose())) + (m_kalmanGain * m_R * (m_kalmanGain.transpose()));
+    m_covarianceAposteriori = m_covarianceApriori - (m_kalmanGain * Sk * m_kalmanGain.transpose());
 }
 
 template<int State, int Input, int Measure>
@@ -169,39 +165,39 @@ void KalmanFilter<State, Input, Measure>::resetKalman()
 //     m_B(5, 5) = delta_t;
 // }
 
-// template<int State, int Input, int Measure>
-// void KalmanFilter<State, Input, Measure>::update_AQmatrix(double delta_t)
-// {
-//     m_A(0, 2) = delta_t;
-//     m_A(1, 3) = delta_t;
-
-//     m_Q(0, 0) = (std::pow(delta_t, 4) / 4) * m_w(0);
-//     m_Q(0, 2) = (std::pow(delta_t, 3) / 2) * m_w(0);
-
-//     m_Q(1, 1) = (std::pow(delta_t, 4) / 4) * m_w(1);
-//     m_Q(1, 3) = (std::pow(delta_t, 3) / 2) * m_w(1);
-
-//     m_Q(2, 0) = (std::pow(delta_t, 3) / 2) * m_w(0);
-//     m_Q(2, 2) = (std::pow(delta_t, 2)) * m_w(0);
-
-//     m_Q(3, 1) = (std::pow(delta_t, 3) / 2) * m_w(1);
-//     m_Q(3, 3) = (std::pow(delta_t, 2)) * m_w(1);
-
-//     m_B(0, 0) = (std::pow(delta_t, 2) / 2);
-//     m_B(1, 1) = (std::pow(delta_t, 2) / 2);
-//     m_B(2, 2) = delta_t;
-//     m_B(3, 3) = delta_t;
-// }
-
 template<int State, int Input, int Measure>
 void KalmanFilter<State, Input, Measure>::update_AQmatrix(double delta_t)
 {
-    m_Q(0, 0) = std::pow(delta_t, 2) * m_w(0);
-    m_Q(1, 1) = std::pow(delta_t, 2) * m_w(1);
+    m_A(0, 2) = delta_t;
+    m_A(1, 3) = delta_t;
 
-    m_B(0, 0) = delta_t;
-    m_B(1, 1) = delta_t;
+    m_Q(0, 0) = (std::pow(delta_t, 4) / 4) * m_w(0);
+    m_Q(0, 2) = (std::pow(delta_t, 3) / 2) * m_w(0);
+
+    m_Q(1, 1) = (std::pow(delta_t, 4) / 4) * m_w(1);
+    m_Q(1, 3) = (std::pow(delta_t, 3) / 2) * m_w(1);
+
+    m_Q(2, 0) = (std::pow(delta_t, 3) / 2) * m_w(0);
+    m_Q(2, 2) = (std::pow(delta_t, 2)) * m_w(0);
+
+    m_Q(3, 1) = (std::pow(delta_t, 3) / 2) * m_w(1);
+    m_Q(3, 3) = (std::pow(delta_t, 2)) * m_w(1);
+
+    m_B(0, 0) = (std::pow(delta_t, 2) / 2);
+    m_B(1, 1) = (std::pow(delta_t, 2) / 2);
+    m_B(2, 2) = delta_t;
+    m_B(3, 3) = delta_t;
 }
+
+// template<int State, int Input, int Measure>
+// void KalmanFilter<State, Input, Measure>::update_AQmatrix(double delta_t)
+// {
+//     m_Q(0, 0) = std::pow(delta_t, 2) * m_w(0);
+//     m_Q(1, 1) = std::pow(delta_t, 2) * m_w(1);
+
+//     m_B(0, 0) = delta_t;
+//     m_B(1, 1) = delta_t;
+// }
 
 template class KalmanFilter<2, 2, 2>;
 template class KalmanFilter<4, 4, 4>;
