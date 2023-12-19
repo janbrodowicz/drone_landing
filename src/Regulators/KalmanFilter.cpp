@@ -85,7 +85,7 @@ void KalmanFilter<State, Input, Measure>::updateEstimate(Eigen::Matrix<double, M
     // additional matrix for kalman gain calculation
     Eigen::MatrixXd Sk;
     Sk.resize(r, r);
-    Sk = m_R + (m_C * m_covarianceApriori * m_C.transpose());
+    Sk = (m_C * m_covarianceApriori * m_C.transpose()) + m_R;
     Sk.inverse();
 
     // kalman gain

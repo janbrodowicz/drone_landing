@@ -16,6 +16,7 @@
 
 #include "Regulators/PIDController.h"
 #include "Regulators/KalmanFilter.h"
+#include "Regulators/KalmanFilterTypes.h"
 
 
 // definition of keybors keys hex codes for drone manual control
@@ -147,7 +148,7 @@ class UavControl
                     //================================================================================
 
                     // update of A and Q matrices
-                    // kalmanFilter.update_AQmatrix(delta_t);
+                    kalmanFilter.update_AQmatrix(delta_t);
 
                     // create matrix for estimation output
                     // Eigen::Matrix<double, 6, 1> kalman_out;
@@ -343,111 +344,11 @@ int main(int argc, char **argv)
     //================================================================================
     //================================================================================
 
-    // Eigen::Matrix<double, 6, 6> A{{1, 0, 0.5, 0, 0.125, 0},
-    //                               {0, 1, 0, 0.5, 0, 0.125},
-    //                               {0, 0, 1, 0, 0.5, 0},
-    //                               {0, 0, 0, 1, 0, 0.5},
-    //                               {0, 0, 0, 0, 1, 0},
-    //                               {0, 0, 0, 0, 0, 1}};
-
-    // Eigen::Matrix<double, 4, 4> A{{1, 0, 0.5, 0},
-    //                               {0, 1, 0, 0.5},
-    //                               {0, 0, 1, 0},
-    //                               {0, 0, 0, 1}};
-
-    double h = 0.5;
-
-    Eigen::Matrix<double, 2, 2> A{{1, 0},
-                                  {0, 1}};
-
-    // control matrix; first assupmption is that sampling time is 0.5s (during operation it'll be updated)
-    // Eigen::Matrix<double, 6, 6> B{{0.041, 0, 0, 0, 0, 0},
-    //                               {0, 0.041, 0, 0, 0, 0},
-    //                               {0, 0, 0.125, 0, 0, 0},
-    //                               {0, 0, 0, 0.125, 0, 0},
-    //                               {0, 0, 0, 0, 0.5, 0},
-    //                               {0, 0, 0, 0, 0, 0.5}};
-
-    // Eigen::Matrix<double, 4, 4> B{{0.125, 0, 0, 0},
-    //                               {0, 0.125, 0, 0},
-    //                               {0, 0, 0.5, 0},
-    //                               {0, 0, 0, 0.5}};
-
-    Eigen::Matrix<double, 2, 2> B{{h, 0},
-                                  {0, h}};
-
-    // observation matrix
-    // Eigen::Matrix<double, 6, 6> C{{1, 0, 0, 0, 0, 0},
-    //                               {0, 1, 0, 0, 0, 0},
-    //                               {0, 0, 1, 0, 0, 0},
-    //                               {0, 0, 0, 1, 0, 0},
-    //                               {0, 0, 0, 0, 1, 0},
-    //                               {0, 0, 0, 0, 0, 1}};
-
-    // Eigen::Matrix<double, 2, 4> C{{1, 0, 0, 0},
-    //                               {0, 1, 0, 0}};
-
-    Eigen::Matrix<double, 2, 2> C{{1, 0},
-                                  {0, 1}};
-
-    // process noise variance vector
-    Eigen::Vector2d w(0, 0); 
-
-    // first assupmption is that sampling time is 0.5s (during operation it'll be updated)
-    // Eigen::Matrix<double, 4, 4> Q{{0.0156 * w(0), 0, 0.0416 * w(0), 0},
-    //                               {0, 0.0156 * w(1), 0, 0.0416 * w(1)},
-    //                               {0.0416 * w(0), 0, 0.25 * w(0), 0},
-    //                               {0, 0.0416 * w(1), 0, 0.25 * w(1)}}; 
-
-    Eigen::Matrix<double, 2, 2> Q{{std::pow(h, 2) * w(0), 0},
-                                  {0, std::pow(h, 2) * w(1)}}; 
-
-    // Eigen::Matrix<double, 6, 6> Q{{0.0017 * w(0), 0, 0.0052 * w(0), 0, 0.0208 * w(0), 0},
-    //                               {0, 0.0017 * w(1), 0, 0.0052 * w(1), 0, 0.0208 * w(1)},
-    //                               {0.0052 * w(0), 0, 0.0156 * w(0), 0, 0.0625 * w(0), 0},
-    //                               {0, 0.0052 * w(1), 0, 0.0156 * w(1), 0, 0.0625 * w(1)},
-    //                               {0.0208 * w(0), 0, 0.0625 * w(0), 0, 0.25 * w(0), 0},
-    //                               {0, 0.0208 * w(1), 0, 0.0625 * w(1), 0, 0.25 * w(1)}}; 
     
-    // measurement covariance matrix (measurement noise)
-    // Eigen::Matrix<double, 6, 6> R{{0.1, 0, 0, 0, 0, 0},
-    //                               {0, 0.1, 0, 0, 0, 0},
-    //                               {0, 0, 0.1, 0, 0, 0},
-    //                               {0, 0, 0, 0.1, 0, 0},
-    //                               {0, 0, 0, 0, 0.1, 0},
-    //                               {0, 0, 0, 0, 0, 0.1}}; // TODO: can try to calculate mean square error of 
-                                                            // measurements and use it for the measurement noise
-    
-    Eigen::Matrix<double, 2, 2> R{{0.01, 0},
-                                  {0, 0.01}};
-
-    // initial estimate covariance (guess)
-    // Eigen::Matrix<double, 6, 6> P0{{0.05, 0, 0, 0, 0, 0},
-    //                                {0, 0.05, 0, 0, 0, 0},
-    //                                {0, 0, 0.05, 0, 0, 0},
-    //                                {0, 0, 0, 0.05, 0, 0},
-    //                                {0, 0, 0, 0, 0.05, 0},
-    //                                {0, 0, 0, 0, 0, 0.05}}; // TODO: find out how to calculate this matrix
-
-    // Eigen::Matrix<double, 4, 4> P0{{0.1, 0, 0, 0},
-    //                                {0, 0.1, 0, 0},
-    //                                {0, 0, 0.1, 0},
-    //                                {0, 0, 0, 0.1}};
-
-    Eigen::Matrix<double, 2, 2> P0{{0.01, 0},
-                                   {0, 0.01}};
-
-    // initial state vector (guess)
-    // Eigen::Matrix<double, 6, 1> x0{{0}, {0}, {0}, {0}, {0.01}, {0.01}};
-
-    // Eigen::Matrix<double, 4, 1> x0{{0}, {0}, {0.01}, {0.01}};
-
-    Eigen::Matrix<double, 2, 1> x0{{0.001}, {0.001}};
-
-    Eigen::Matrix<double, 2, 1> G{{0}, {0}};
-
     // Kalman Filter initialization
-    kalman::KalmanFilter<2, 2, 2> kalmanFilter(A, B, C, G, Q, R, w, P0, x0);
+    kalman::KalmanFilter<2, 2, 2> kalmanFilter(kalman_CP::A, kalman_CP::B, kalman_CP::C,
+                                               kalman_CP::G, kalman_CP::Q, kalman_CP::R,
+                                               kalman_CP::w, kalman_CP::P0, kalman_CP::x0);
 
 
     //================================================================================
