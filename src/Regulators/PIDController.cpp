@@ -38,3 +38,9 @@ std::vector<double> PIDController::get_params()
 {
     return {m_Kp, m_Ki, m_Kd};
 }
+
+void PIDController::reset_pid()
+{
+    m_sum = 0;
+    m_prev = 0;
+}

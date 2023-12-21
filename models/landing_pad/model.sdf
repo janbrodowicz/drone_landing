@@ -1,4 +1,5 @@
-<?xml version="1.0" ?><sdf version="1.6">
+<?xml version="1.0" ?>
+<sdf version="1.6">
   <model name="landing_pad">
     <static>true</static>
     <link name="link">
@@ -10,5 +11,8 @@
         </geometry>
       </visual>
     </link>
+    
+    <!-- <plugin name="push_animate" filename="libmoving_pad.so"/> -->
+    <plugin name="push_animate" filename="libmoving_pad_circle.so"/>
   </model>
 </sdf>

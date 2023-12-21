@@ -17,11 +17,7 @@ namespace pid
             // function for returning current PID parameters
             std::vector<double> get_params();
 
-            // sum of errors
-            double m_sum;
-
-            // previous error
-            double m_prev;
+            void reset_pid();
 
         private:
 
@@ -33,6 +29,12 @@ namespace pid
 
             // Kd (for D part of the regulator)
             double m_Kd;
+
+            // sum of errors
+            double m_sum;
+
+            // previous error
+            double m_prev;
     };
 
 } // namespace pid

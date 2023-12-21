@@ -35,7 +35,7 @@ namespace kalman_CV
 {
     double h = 0.5;
 
-    Eigen::Vector2d w(0, 0); 
+    Eigen::Vector2d w(0.0001, 0.0001); 
 
     Eigen::Matrix<double, 4, 4> A{{1, 0, h, 0},
                                   {0, 1, 0, h},
@@ -46,6 +46,11 @@ namespace kalman_CV
                                   {0, (std::pow(h, 2) / 2), 0, 0},
                                   {0, 0, h, 0},
                                   {0, 0, 0, h}};
+
+    // Eigen::Matrix<double, 4, 4> C{{1, 0, 0, 0},
+    //                               {0, 1, 0, 0},
+    //                               {0, 0, 1, 0},
+    //                               {0, 0, 0, 1}};
 
     Eigen::Matrix<double, 2, 4> C{{1, 0, 0, 0},
                                   {0, 1, 0, 0}};
@@ -62,10 +67,15 @@ namespace kalman_CV
                                    {0, 0, 0.01, 0},
                                    {0, 0, 0, 0.01}};
 
-    Eigen::Matrix<double, 2, 2> R{{0.01, 0},
-                                  {0, 0.01}};
+    // Eigen::Matrix<double, 4, 4> R{{1, 0, 0, 0},
+    //                               {0, 1, 0, 0},
+    //                               {0, 0, 1, 0},
+    //                               {0, 0, 0, 1}};
 
-    Eigen::Matrix<double, 4, 1> x0{{0}, {0}, {0.01}, {0.01}};
+    Eigen::Matrix<double, 2, 2> R{{0.5, 0},
+                                  {0, 0.5}};
+
+    Eigen::Matrix<double, 4, 1> x0{{0.001}, {0.001}, {0.01}, {0.01}};
 
 }
 

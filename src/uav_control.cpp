@@ -9,6 +9,7 @@
 #include <sensor_msgs/Imu.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
+#include <gazebo_msgs/ModelStates.h>
 #include <rosbag/bag.h>
 
 #include <termios.h>
@@ -38,7 +39,7 @@ class UavControl
 {
     public:
         
-        UavControl() : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0), m_x_pid(0), m_y_pid(0)
+        UavControl() : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0), m_first_loop(true)
         {
             state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 10, &UavControl::state_cb, this);
             droneLand_sub = nh.subscribe<ros_landing::droneLand>("/droneLand", 10, &UavControl::droneLand_cb, this);
@@ -46,6 +47,7 @@ class UavControl
             drone_actual_pose = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, &UavControl::pose_cb, this);
             drone_velocity = nh.subscribe<geometry_msgs::TwistStamped>("mavros/local_position/velocity_body", 10, &UavControl::velocity_cb, this);
             drone_accel = nh.subscribe<sensor_msgs::Imu>("mavros/imu/data_raw", 10, &UavControl::accel_cb, this);
+            landing_pad_pos = nh.subscribe<gazebo_msgs::ModelStates>("gazebo/model_states", 10, &UavControl::landing_pad_cb, this);
 
             cmd_vel_pub = nh.advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 10);
             arming_client = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
@@ -54,15 +56,17 @@ class UavControl
             PIDx = nh.advertise<std_msgs::Float32>("PID/x", 10);
             PIDy = nh.advertise<std_msgs::Float32>("PID/y", 10);
 
-            bag_pid.open("pid_output.bag", rosbag::bagmode::Write);
-            bag_kalman.open("kalman_output.bag", rosbag::bagmode::Write);
+            // bag_pid.open("pid_output.bag", rosbag::bagmode::Write);
+            // bag_kalman.open("kalman_output.bag", rosbag::bagmode::Write);
+            bag_drone_pad_pos.open("drone_pad_pos.bag", rosbag::bagmode::Write);
 
             m_actual_pose.reserve(3);
             m_velocity.reserve(3);
             m_accel.reserve(3);
+            m_landing_pad_pos.reserve(3);
         }
 
-        UavControl(kalman::KalmanFilter<State, Input, Measure> filter) : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0), kalmanFilter(filter), m_x_pid(0), m_y_pid(0)
+        UavControl(kalman::KalmanFilter<State, Input, Measure> filter) : m_landing(false), m_ang(-500), time_now(ros::Time::now()), pid_x(1, 0, 0), pid_y(1, 0, 0), m_kalmanFilter(filter), m_first_loop(true)
         {
             state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 10, &UavControl::state_cb, this);
             droneLand_sub = nh.subscribe<ros_landing::droneLand>("/droneLand", 10, &UavControl::droneLand_cb, this);
@@ -70,6 +74,7 @@ class UavControl
             drone_actual_pose = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, &UavControl::pose_cb, this);
             drone_velocity = nh.subscribe<geometry_msgs::TwistStamped>("mavros/local_position/velocity_body", 10, &UavControl::velocity_cb, this);
             drone_accel = nh.subscribe<sensor_msgs::Imu>("mavros/imu/data_raw", 10, &UavControl::accel_cb, this);
+            landing_pad_pos = nh.subscribe<gazebo_msgs::ModelStates>("gazebo/model_states", 10, &UavControl::landing_pad_cb, this);
 
             cmd_vel_pub = nh.advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 10);
             arming_client = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
@@ -78,18 +83,21 @@ class UavControl
             PIDx = nh.advertise<std_msgs::Float32>("PID/x", 10);
             PIDy = nh.advertise<std_msgs::Float32>("PID/y", 10);
 
-            bag_pid.open("pid_output.bag", rosbag::bagmode::Write);
-            bag_kalman.open("kalman_output.bag", rosbag::bagmode::Write);
+            // bag_pid.open("pid_output.bag", rosbag::bagmode::Write);
+            // bag_kalman.open("kalman_output.bag", rosbag::bagmode::Write);
+            bag_drone_pad_pos.open("drone_pad_pos.bag", rosbag::bagmode::Write);
 
             m_actual_pose.reserve(3);
             m_velocity.reserve(3);
             m_accel.reserve(3);
+            m_landing_pad_pos.reserve(3);
         }
 
         ~UavControl()
         {
-            bag_pid.close();
-            bag_kalman.close();
+            // bag_pid.close();
+            // bag_kalman.close();
+            bag_drone_pad_pos.close();
         }
 
         void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
@@ -111,6 +119,13 @@ class UavControl
             m_accel[0] = msg->linear_acceleration.x;
             m_accel[1] = msg->linear_acceleration.y;
             m_accel[2] = msg->linear_acceleration.z;
+        }
+
+        void landing_pad_cb(const gazebo_msgs::ModelStates::ConstPtr& msg)
+        {
+            m_landing_pad_pos[0] = msg->pose[1].position.x;
+            m_landing_pad_pos[1] = msg->pose[1].position.y;
+            m_landing_pad_pos[2] = msg->pose[1].position.z;
         }
 
         void state_cb(const mavros_msgs::State::ConstPtr& msg)
@@ -147,29 +162,27 @@ class UavControl
                     //================================================================================
                     //================================================================================
 
-                    // update of A and Q matrices
-                    kalmanFilter.update_AQmatrix(delta_t);
+                    if(!m_first_loop)
+                    {
+                        // creating vector for measurement
+                        Eigen::Matrix<double, 2, 1> measurement{{m_x}, {m_y}};
 
-                    // create matrix for estimation output
-                    // Eigen::Matrix<double, 6, 1> kalman_out;
-                    // Eigen::Matrix<double, 4, 1> kalman_out;
-                    Eigen::Matrix<double, 2, 1> kalman_out;
+                        // kalman update step
+                        m_kalmanFilter.updateEstimate(measurement);
+                    }
+
+                    // update of A and Q matrices
+                    m_kalmanFilter.update_AQmatrix(delta_t);
 
                     // setting input to the system to 0.1 (process noise)
                     // Eigen::Matrix<double, 6, 1> input{{0.1}, {0.01}, {0.01}, {0.01}, {0.01}, {0.01}};
-                    // Eigen::Matrix<double, 4, 1> input{{0.01}, {0.01}, {0.01}, {0.01}};
-                    Eigen::Matrix<double, 2, 1> input{{(-0.4) * m_y}, {(-0.4) * m_x}};
+                    Eigen::Matrix<double, 4, 1> input{{0.0001}, {0.0001}, {0.0001}, {0.0001}};
+                    // Eigen::Matrix<double, 2, 1> input{{(-0.4) * m_y}, {(-0.4) * m_x}};
                     // Eigen::Matrix<double, 2, 1> input{{0.001}, {0.001}};
 
                     // kalman prediction step
-                    kalman_out = kalmanFilter.predictEstimate(input);
+                    m_kalman_out = m_kalmanFilter.predictEstimate(input);
 
-                    // creating vector for measurement
-                    // Eigen::Matrix<double, 6, 1> measurement{{m_x}, {m_y}, {m_velocity[1]}, {m_velocity[0]}, {m_accel[1]}, {m_accel[0]}};
-                    Eigen::Matrix<double, 2, 1> measurement{{m_x}, {m_y}};
-
-                    // kalman update step
-                    kalmanFilter.updateEstimate(measurement);
 
                     //================================================================================
                     //================================================================================
@@ -178,6 +191,9 @@ class UavControl
 
                     //================================================================================
                     //================================================================================
+
+                    // m_x_pid = pid_x.run(0, m_kalman_out(0), delta_t);
+                    // m_y_pid = pid_y.run(0, m_kalman_out(1), delta_t);
 
                     m_x_pid = pid_x.run(0, m_x, delta_t);
                     m_y_pid = pid_y.run(0, m_y, delta_t);
@@ -191,14 +207,24 @@ class UavControl
                     // kalman output to ros msgs
                     std_msgs::Float32 x_estimate;
                     std_msgs::Float32 y_estimate;
-                    x_estimate.data = kalman_out(0);
-                    y_estimate.data = kalman_out(1);
+                    x_estimate.data = m_kalman_out(0);
+                    y_estimate.data = m_kalman_out(1);
 
                     // actual pose to ros msgs
                     std_msgs::Float32 x_actual;
                     std_msgs::Float32 y_actual;
+                    std_msgs::Float32 z_actual;
                     x_actual.data = m_actual_pose[0];
                     y_actual.data = m_actual_pose[1];
+                    z_actual.data = m_actual_pose[2];
+
+                    // landing pad pose to ros msgs
+                    std_msgs::Float32 x_pad;
+                    std_msgs::Float32 y_pad;
+                    std_msgs::Float32 z_pad;
+                    x_pad.data = m_landing_pad_pos[0];
+                    y_pad.data = m_landing_pad_pos[1];
+                    z_pad.data = m_landing_pad_pos[2];
 
                     // measurement to ros msgs
                     std_msgs::Float32 x_measure;
@@ -210,19 +236,29 @@ class UavControl
                     // write data to a bag file
                     if(m_landing)
                     {
-                        bag_pid.write("pid_x", ros::Time::now(), x_msg);
-                        bag_pid.write("pid_y", ros::Time::now(), y_msg);
+                        // bag_pid.write("pid_x", ros::Time::now(), x_msg);
+                        // bag_pid.write("pid_y", ros::Time::now(), y_msg);
 
-                        bag_kalman.write("estimate_x", ros::Time::now(), x_estimate);
-                        bag_kalman.write("estimate_y", ros::Time::now(), y_estimate);
-                        bag_kalman.write("measurement_x", ros::Time::now(), x_measure);
-                        bag_kalman.write("measurement_y", ros::Time::now(), y_measure);
-                        bag_kalman.write("actual_x", ros::Time::now(), x_actual);
-                        bag_kalman.write("actual_y", ros::Time::now(), y_actual);
+                        // bag_kalman.write("estimate_x", ros::Time::now(), x_estimate);
+                        // bag_kalman.write("estimate_y", ros::Time::now(), y_estimate);
+                        // bag_kalman.write("measurement_x", ros::Time::now(), x_measure);
+                        // bag_kalman.write("measurement_y", ros::Time::now(), y_measure);
+                        // bag_kalman.write("actual_x", ros::Time::now(), x_actual);
+                        // bag_kalman.write("actual_y", ros::Time::now(), y_actual);
+
+                        bag_drone_pad_pos.write("drone_x", ros::Time::now(), x_actual);
+                        bag_drone_pad_pos.write("drone_y", ros::Time::now(), y_actual);
+                        bag_drone_pad_pos.write("drone_z", ros::Time::now(), z_actual);
+
+                        bag_drone_pad_pos.write("pad_x", ros::Time::now(), x_pad);
+                        bag_drone_pad_pos.write("pad_y", ros::Time::now(), y_pad);
+                        bag_drone_pad_pos.write("pad_z", ros::Time::now(), z_pad);
                     }
 
                     PIDx.publish(x_msg);
                     PIDy.publish(y_msg);
+
+                    m_first_loop = false;
                 }
             }
             
@@ -292,6 +328,7 @@ class UavControl
         }
 
         bool m_landing;
+        bool m_first_loop;
         double m_x_pid;
         double m_y_pid;
         double m_x;
@@ -301,11 +338,13 @@ class UavControl
         std::vector<double> m_actual_pose;
         std::vector<double> m_velocity;
         std::vector<double> m_accel;
+        std::vector<double> m_landing_pad_pos;
 
         pid::PIDController pid_x;
         pid::PIDController pid_y;
 
-        kalman::KalmanFilter<State, Input, Measure> kalmanFilter;
+        kalman::KalmanFilter<State, Input, Measure> m_kalmanFilter;
+        Eigen::Matrix<double, State, 1> m_kalman_out;
     
     private:
 
@@ -316,6 +355,7 @@ class UavControl
         ros::Subscriber drone_actual_pose;
         ros::Subscriber drone_velocity;
         ros::Subscriber drone_accel;
+        ros::Subscriber landing_pad_pos;
         ros::Publisher local_pos_pub;
         ros::Publisher cmd_vel_pub;
         ros::ServiceClient arming_client;
@@ -327,8 +367,9 @@ class UavControl
         ros::Publisher PIDx;
         ros::Publisher PIDy;
 
-        rosbag::Bag bag_pid;
-        rosbag::Bag bag_kalman;
+        // rosbag::Bag bag_pid;
+        // rosbag::Bag bag_kalman;
+        rosbag::Bag bag_drone_pad_pos;
 };
      
 
@@ -346,9 +387,9 @@ int main(int argc, char **argv)
 
     
     // Kalman Filter initialization
-    kalman::KalmanFilter<2, 2, 2> kalmanFilter(kalman_CP::A, kalman_CP::B, kalman_CP::C,
-                                               kalman_CP::G, kalman_CP::Q, kalman_CP::R,
-                                               kalman_CP::w, kalman_CP::P0, kalman_CP::x0);
+    kalman::KalmanFilter<4, 4, 2> kalmanFilter(kalman_CV::A, kalman_CV::B, kalman_CV::C,
+                                               kalman_CV::G, kalman_CV::Q, kalman_CV::R,
+                                               kalman_CV::w, kalman_CV::P0, kalman_CV::x0);
 
 
     //================================================================================
@@ -360,7 +401,7 @@ int main(int argc, char **argv)
     //================================================================================
 
     // UavControl initialization
-    UavControl<2, 2, 2> uav(kalmanFilter);
+    UavControl<4, 4, 2> uav(kalmanFilter);
 
     // PID parameters
     std::vector<double> PidParams = {1, 0, 0};
@@ -504,20 +545,25 @@ int main(int argc, char **argv)
                     pos.velocity.x = 0;
                     pos.velocity.y = 0;
                     pos.velocity.z = 0;
+                    ROS_INFO("VELOCITIES RESET!!!");
                 }
 				break;
             case KEYCODE_C:
                 // turn on automatic landing
                 uav.m_landing = true;
+                ROS_INFO("AUTOMATIC LANDING PROCEDURE SELECTED!!!");
                 break;
             case KEYCODE_V:
                 // turn off automatic landing also clear sum of errors and previous error for PIDs
                 uav.m_landing = false;
-                uav.pid_x.m_sum = 0;
-                uav.pid_y.m_sum = 0;
-                uav.pid_x.m_prev = 0;
-                uav.pid_y.m_prev = 0;
-                uav.kalmanFilter.resetKalman();
+
+                uav.pid_x.reset_pid();
+                uav.pid_y.reset_pid();
+
+                uav.m_kalmanFilter.resetKalman();
+                uav.m_first_loop = true;
+
+                ROS_INFO("AUTOMATIC LANDING PROCEDURE TUNRNED OFF!!!");
                 break;
 			default:
 				break;				
@@ -526,19 +572,40 @@ int main(int argc, char **argv)
         // if automatic landing is turned on and landing pad is detected
         if(uav.m_landing && uav.m_ang != -500)
         {
-            // X and Y are different for drone coordinate frame and image frame
-            pos.velocity.y = uav.m_x_pid;
-            pos.velocity.x = uav.m_y_pid;
-            pos.velocity.z = 0;
+            if(uav.m_lidar > 0.5)
+            {
+                uav.pid_x.update_pid_settings({0.4, 0.0, 0.0});
+                uav.pid_y.update_pid_settings({0.4, 0.0, 0.0});
 
-            // if distances on X and Y from center of the landing pad is less than 10cm and altitude is more than 1cm
-            // if(std::abs(uav.m_x) <= 0.1 && std::abs(uav.m_y) <= 0.1 && uav.m_lidar > 0.1)
-            // {
-            //     // lower the altitude (by velocity)
-            //     pos.velocity.z = -0.1;
-            // }
+                pos.velocity.y = uav.m_x_pid;
+                pos.velocity.x = uav.m_y_pid;
 
-            ROS_INFO("PID output: X: %f, Y: %f", uav.m_x, uav.m_y);
+                if(std::sqrt(std::pow(uav.m_x, 2) - std::pow(uav.m_y, 2)) <= 0.15)
+                {
+                    pos.velocity.z = -0.07;
+                }
+                else
+                {
+                    pos.velocity.z = 0.0;
+                }
+            }
+            else if(uav.m_lidar <= 0.5)
+            {
+                uav.pid_x.update_pid_settings({0.5, 0.01, 0.15});
+                uav.pid_y.update_pid_settings({0.5, 0.01, 0.15});
+
+                pos.velocity.y = uav.m_x_pid;
+                pos.velocity.x = uav.m_y_pid;
+
+                if(std::sqrt(std::pow(uav.m_x, 2) - std::pow(uav.m_y, 2)) <= 0.08)
+                {
+                    pos.velocity.z = -0.1;
+                }
+                else
+                {
+                    pos.velocity.z = 0.0;
+                }
+            }
         }
 
         // publish message with drone velocity
