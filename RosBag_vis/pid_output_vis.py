@@ -9,18 +9,20 @@ import pandas as pd
 # b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/PID_bags/pid_P_output.bag")
 # b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/pid_PI_output.bag")
 # b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/pid_PID_output.bag")
-# b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/PID_bags/pid_output.bag")
+# b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/PID_bags/pid_output_landing_12_static_box.bag")
 # PID_X = b.message_by_topic("pid_x")
 # PID_Y = b.message_by_topic("pid_y")
 
 # df_pid_x = pd.read_csv(PID_X)
 # df_pid_y = pd.read_csv(PID_Y)
-# # print(df_pid_x[df_pid_x['Time']>3481])
+# # # # # # # print(df_pid_x[df_pid_x['Time']>3481])
 
 # fig, ax = plt.subplots(2)
 # ax[0].plot(df_pid_x["Time"].tolist(), df_pid_x["data"].tolist())
+# # ax[0].set_ylim([-0.15, 0.15])
 # ax[0].grid()
 # ax[1].plot(df_pid_y["Time"].tolist(), df_pid_y["data"].tolist())
+# # ax[1].set_ylim([-0.15, 0.15])
 # ax[1].grid()
 # plt.show()
 
@@ -146,36 +148,44 @@ import pandas as pd
 #========================================================================================================================
 
 
-b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Position/drone_pad_pos_circle_1_(very_good).bag")
+# b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Position/drone_pad_pos_12_(PID_output)_static_box.bag")
 
-x_drone = b.message_by_topic("drone_x")
-y_drone = b.message_by_topic("drone_y")
-z_drone = b.message_by_topic("drone_z")
+# x_drone = b.message_by_topic("drone_x")
+# y_drone = b.message_by_topic("drone_y")
+# z_drone = b.message_by_topic("drone_z")
 
-x_pad = b.message_by_topic("pad_x")
-y_pad = b.message_by_topic("pad_y")
-z_pad = b.message_by_topic("pad_z")
-
-
-df_x_drone = pd.read_csv(x_drone)
-df_y_drone = pd.read_csv(y_drone)
-df_z_drone = pd.read_csv(z_drone)
-
-df_x_pad = pd.read_csv(x_pad)
-df_y_pad = pd.read_csv(y_pad)
-df_z_pad = pd.read_csv(z_pad)
+# x_pad = b.message_by_topic("pad_x")
+# y_pad = b.message_by_topic("pad_y")
+# z_pad = b.message_by_topic("pad_z")
 
 
-fig = plt.figure()
-ax = fig.add_subplot(projection='3d')
-ax.plot(df_x_drone['data'].to_list(), df_y_drone['data'].to_list(), df_z_drone['data'].to_list())
-ax.plot(df_x_pad['data'].to_list(), df_y_pad['data'].to_list(), df_z_pad['data'].to_list())
-# ax.set_ylim(-1, 1)
-plt.show()
+# df_x_drone = pd.read_csv(x_drone)
+# df_y_drone = pd.read_csv(y_drone)
+# df_z_drone = pd.read_csv(z_drone)
+
+# df_x_pad = pd.read_csv(x_pad)
+# df_y_pad = pd.read_csv(y_pad)
+# df_z_pad = pd.read_csv(z_pad)
+
+# min_z = min(df_z_drone['data'].to_list())
+# z_list = [x - min_z for x in df_z_drone['data'].to_list()]
+
+# fig = plt.figure()
+# ax = fig.add_subplot(projection='3d')
+# ax.plot(df_x_drone['data'].to_list(), df_y_drone['data'].to_list(), df_z_drone['data'].to_list())
+# ax.plot(df_x_pad['data'].to_list(), df_y_pad['data'].to_list(), df_z_pad['data'].to_list())
+# # ax.set_ylim(-1, 1)
+# # ax.set_xlim(-1, 1)
+# ax.set_ylim(-0.5, 0.5)
+# ax.set_xlim(-0.5, 0.5)
+# plt.show()
 
 # plt.plot(df_x_drone['data'].to_list(), df_y_drone['data'].to_list())
 # plt.plot(df_x_pad['data'].to_list(), df_y_pad['data'].to_list())
-# # plt.ylim([-0.4, 0.4])
+# # plt.ylim([-0.4,0.4])
+# # plt.xlim([-0.4,0.4])
+# plt.ylim([-0.2,0.2])
+# plt.xlim([-0.2,0.2])
 # plt.grid()
 # plt.show()
 

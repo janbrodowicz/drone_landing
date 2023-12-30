@@ -60,8 +60,8 @@
     
     <!-- Landing Pad -->
     <include>
-      <uri>model://landing_pad</uri>
-      <pose>0 0 0 0 0 0 0</pose>
+      <uri>model://landing_box</uri>
+      <pose>0 0 0.1 0 0 0</pose>
     </include> 
 
     

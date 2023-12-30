@@ -71,7 +71,7 @@ class UavControl
             state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 10, &UavControl::state_cb, this);
             droneLand_sub = nh.subscribe<ros_landing::droneLand>("/droneLand", 10, &UavControl::droneLand_cb, this);
             lidar_sub = nh.subscribe<sensor_msgs::LaserScan>("/laser/scan", 10, &UavControl::lidar_cb, this);
-            drone_actual_pose = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, &UavControl::pose_cb, this);
+            // drone_actual_pose = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, &UavControl::pose_cb, this);
             drone_velocity = nh.subscribe<geometry_msgs::TwistStamped>("mavros/local_position/velocity_body", 10, &UavControl::velocity_cb, this);
             drone_accel = nh.subscribe<sensor_msgs::Imu>("mavros/imu/data_raw", 10, &UavControl::accel_cb, this);
             landing_pad_pos = nh.subscribe<gazebo_msgs::ModelStates>("gazebo/model_states", 10, &UavControl::landing_pad_cb, this);
@@ -83,7 +83,7 @@ class UavControl
             PIDx = nh.advertise<std_msgs::Float32>("PID/x", 10);
             PIDy = nh.advertise<std_msgs::Float32>("PID/y", 10);
 
-            // bag_pid.open("pid_output.bag", rosbag::bagmode::Write);
+            bag_pid.open("pid_output.bag", rosbag::bagmode::Write);
             // bag_kalman.open("kalman_output.bag", rosbag::bagmode::Write);
             bag_drone_pad_pos.open("drone_pad_pos.bag", rosbag::bagmode::Write);
 
@@ -95,17 +95,17 @@ class UavControl
 
         ~UavControl()
         {
-            // bag_pid.close();
+            bag_pid.close();
             // bag_kalman.close();
             bag_drone_pad_pos.close();
         }
 
-        void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
-        {
-            m_actual_pose[0] = msg->pose.position.x;
-            m_actual_pose[1] = msg->pose.position.y;
-            m_actual_pose[2] = msg->pose.position.z;
-        }
+        // void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
+        // {
+        //     m_actual_pose[0] = msg->pose.position.x;
+        //     m_actual_pose[1] = msg->pose.position.y;
+        //     m_actual_pose[2] = msg->pose.position.z;
+        // }
 
         void velocity_cb(const geometry_msgs::TwistStamped::ConstPtr& msg)
         {
@@ -126,6 +126,10 @@ class UavControl
             m_landing_pad_pos[0] = msg->pose[1].position.x;
             m_landing_pad_pos[1] = msg->pose[1].position.y;
             m_landing_pad_pos[2] = msg->pose[1].position.z;
+
+            m_actual_pose[0] = msg->pose[2].position.x;
+            m_actual_pose[1] = msg->pose[2].position.y;
+            m_actual_pose[2] = msg->pose[2].position.z;
         }
 
         void state_cb(const mavros_msgs::State::ConstPtr& msg)
@@ -236,8 +240,8 @@ class UavControl
                     // write data to a bag file
                     if(m_landing)
                     {
-                        // bag_pid.write("pid_x", ros::Time::now(), x_msg);
-                        // bag_pid.write("pid_y", ros::Time::now(), y_msg);
+                        bag_pid.write("pid_x", ros::Time::now(), x_msg);
+                        bag_pid.write("pid_y", ros::Time::now(), y_msg);
 
                         // bag_kalman.write("estimate_x", ros::Time::now(), x_estimate);
                         // bag_kalman.write("estimate_y", ros::Time::now(), y_estimate);
@@ -367,7 +371,7 @@ class UavControl
         ros::Publisher PIDx;
         ros::Publisher PIDy;
 
-        // rosbag::Bag bag_pid;
+        rosbag::Bag bag_pid;
         // rosbag::Bag bag_kalman;
         rosbag::Bag bag_drone_pad_pos;
 };
@@ -606,6 +610,9 @@ int main(int argc, char **argv)
                     pos.velocity.z = 0.0;
                 }
             }
+
+            // pos.velocity.y = uav.m_x_pid;
+            // pos.velocity.x = uav.m_y_pid;
         }
 
         // publish message with drone velocity

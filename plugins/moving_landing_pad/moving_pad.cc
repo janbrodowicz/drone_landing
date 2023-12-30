@@ -40,14 +40,14 @@ namespace gazebo
 
         // set starting location of the box
         key = anim->CreateKeyFrame(0);
-        key->Translation(ignition::math::Vector3d(0, 0, 0));
+        key->Translation(ignition::math::Vector3d(0, 0, 0.1));
 
         // set waypoint location after 2 seconds
         key = anim->CreateKeyFrame(200.0);
-        key->Translation(ignition::math::Vector3d(10.0, 0, 0));
+        key->Translation(ignition::math::Vector3d(10.0, 0, 0.1));
 
         key = anim->CreateKeyFrame(400.0);
-        key->Translation(ignition::math::Vector3d(0, 0, 0));
+        key->Translation(ignition::math::Vector3d(0, 0, 0.1));
 
         // set the animation
         _parent->SetAnimation(anim);
