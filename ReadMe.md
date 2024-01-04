@@ -27,6 +27,7 @@
 	    frame_id: "map"
 	    child_frame_id: "base_link"
 	    send_fcu: false
+	```
    
    to:
    
@@ -38,6 +39,7 @@
 	    frame_id: "map"
 	    child_frame_id: "base_link"
 	    send_fcu: false
+	```
 
 ### Launching steps
 
