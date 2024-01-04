@@ -84,15 +84,12 @@ void KalmanFilter<State, Input, Measure>::updateEstimate(Eigen::Matrix<double, M
 {
     // additional matrix for kalman gain calculation
     Eigen::MatrixXd Sk;
-    Eigen::MatrixXd Sk_inv;
     Sk.resize(r, r);
-    Sk_inv.resize(r, r);
     Sk = (m_C * m_covarianceApriori * m_C.transpose()) + m_R;
-    Sk_inv = Sk;
-    Sk_inv.inverse();
+    Sk.inverse();
 
     // kalman gain
-    m_kalmanGain = m_covarianceApriori * (m_C.transpose()) * Sk_inv;
+    m_kalmanGain = m_covarianceApriori * (m_C.transpose()) * Sk;
 
     // error
     m_error = measurement - (m_C * m_estimateApriori);
@@ -100,8 +97,15 @@ void KalmanFilter<State, Input, Measure>::updateEstimate(Eigen::Matrix<double, M
     // calculate posteriori estimate
     m_estimateAposteriori = m_estimateApriori + (m_kalmanGain * m_error);
 
+    // additional matrices for a posteriori covariance calculation
+    Eigen::MatrixXd I;
+    I = Eigen::MatrixXd::Identity(n, n); 
+    Eigen::MatrixXd Iminus;
+    Iminus.resize(n, n);
+    Iminus = I - (m_kalmanGain * m_C);
+
     // calculate posteriori covariance
-    m_covarianceAposteriori = m_covarianceApriori - (m_kalmanGain * Sk * m_kalmanGain.transpose());
+    m_covarianceAposteriori = Iminus * m_covarianceApriori;
 }
 
 template<int State, int Input, int Measure>
@@ -121,6 +125,12 @@ void KalmanFilter<State, Input, Measure>::resetKalman()
     m_kalmanGain.setZero();
 
     m_error.setZero();
+}
+
+template<int State, int Input, int Measure>
+void KalmanFilter<State, Input, Measure>::updateInitial(Eigen::Matrix<double, State, 1> x0_in)
+{
+    m_estimateAposteriori = x0_in;
 }
 
 // template<int State, int Input, int Measure>

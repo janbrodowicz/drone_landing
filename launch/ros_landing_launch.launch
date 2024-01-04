@@ -6,7 +6,7 @@
     <arg name="px4_dir" default="/home/jan/PX4/PX4-Autopilot"/>
 
     <include file="$(arg px4_dir)/launch/mavros_posix_sitl.launch">
-        <arg name="x" value="0"/>
+        <arg name="x" value="-1"/>
         <arg name="y" value="0"/>
         <arg name="z" value="0"/>
         <arg name="respawn_gazebo" value="true"/>

@@ -25,6 +25,8 @@ namespace kalman
             // function to reset kalman matrices in case of turning off automatic landing 
             void resetKalman();
 
+            void updateInitial(Eigen::Matrix<double, State, 1> x0_in);
+
             // setting A matrix with current time difference
             void update_AQmatrix(double delta_t);
 

@@ -11,6 +11,7 @@
 #include <geometry_msgs/TwistStamped.h>
 #include <gazebo_msgs/ModelStates.h>
 #include <rosbag/bag.h>
+#include <tf/transform_listener.h>
 
 #include <termios.h>
 #include <Eigen3/Eigen/Dense>
@@ -84,7 +85,7 @@ class UavControl
             PIDy = nh.advertise<std_msgs::Float32>("PID/y", 10);
 
             bag_pid.open("pid_output.bag", rosbag::bagmode::Write);
-            // bag_kalman.open("kalman_output.bag", rosbag::bagmode::Write);
+            bag_kalman.open("kalman_output.bag", rosbag::bagmode::Write);
             bag_drone_pad_pos.open("drone_pad_pos.bag", rosbag::bagmode::Write);
 
             m_actual_pose.reserve(3);
@@ -96,7 +97,7 @@ class UavControl
         ~UavControl()
         {
             bag_pid.close();
-            // bag_kalman.close();
+            bag_kalman.close();
             bag_drone_pad_pos.close();
         }
 
@@ -166,10 +167,33 @@ class UavControl
                     //================================================================================
                     //================================================================================
 
+                    position_in_cam = tf::Vector3(m_y, m_x, 0.2);
+
+                    try
+                    {
+                        ros::Time now = ros::Time::now();
+                        tf_listener.waitForTransform("/map", "/base_link", now, ros::Duration(3.0));
+
+                        tf_listener.lookupTransform("/map", "/base_link", ros::Time(0), T_world_cam);
+                    }
+                    catch(tf::TransformException ex)
+                    {
+                        ROS_ERROR("%s",ex.what());
+                        ros::Duration(1.0).sleep();
+                    }
+
+                    position_in_world = T_world_cam * position_in_cam;
+
+                    if(m_first_loop)
+                    {
+                        Eigen::Matrix<double, 4, 1> init{{m_actual_pose[0]}, {m_actual_pose[1]}, {0.01}, {0.01}};
+                        m_kalmanFilter.updateInitial(init);
+                    }
+                    
                     if(!m_first_loop)
                     {
                         // creating vector for measurement
-                        Eigen::Matrix<double, 2, 1> measurement{{m_x}, {m_y}};
+                        Eigen::Matrix<double, 2, 1> measurement{{position_in_world.getX() - 1}, {position_in_world.getY()}};
 
                         // kalman update step
                         m_kalmanFilter.updateEstimate(measurement);
@@ -187,6 +211,25 @@ class UavControl
                     // kalman prediction step
                     m_kalman_out = m_kalmanFilter.predictEstimate(input);
 
+                    try
+                    {
+                        ros::Time now = ros::Time::now();
+                        tf_listener.waitForTransform("/base_link", "/map", now, ros::Duration(3.0));
+
+                        tf_listener.lookupTransform("/base_link", "/map", now, T_world_cam_inv);
+                    }
+                    catch(tf::TransformException ex)
+                    {
+                        ROS_ERROR("%s",ex.what());
+                        ros::Duration(1.0).sleep();
+                    }
+
+                    // T_world_cam_inv = T_world_cam;
+                    // T_world_cam_inv.inverse();
+
+                    position_in_world_kalman = tf::Vector3(m_kalman_out(0), m_kalman_out(1), 0.2);
+
+                    position_in_cam_kalman = T_world_cam_inv * position_in_world_kalman;
 
                     //================================================================================
                     //================================================================================
@@ -196,8 +239,11 @@ class UavControl
                     //================================================================================
                     //================================================================================
 
-                    // m_x_pid = pid_x.run(0, m_kalman_out(0), delta_t);
-                    // m_y_pid = pid_y.run(0, m_kalman_out(1), delta_t);
+                    // double x_kalman_pid = position_in_cam_kalman.getX() * (-1);
+                    // double y_kalman_pid = (position_in_cam_kalman.getY() - 1) * (-1);
+
+                    // m_x_pid = pid_x.run(0, x_kalman_pid, delta_t);
+                    // m_y_pid = pid_y.run(0, y_kalman_pid, delta_t);
 
                     m_x_pid = pid_x.run(0, m_x, delta_t);
                     m_y_pid = pid_y.run(0, m_y, delta_t);
@@ -235,6 +281,18 @@ class UavControl
                     std_msgs::Float32 y_measure;
                     x_measure.data = m_x;
                     y_measure.data = m_y;
+                    // x_measure.data = position_in_world.getX() - 1;
+                    // y_measure.data = position_in_world.getY();
+
+                    std_msgs::Float32 x_measure_tf;
+                    std_msgs::Float32 y_measure_tf;
+                    x_measure_tf.data = position_in_cam_kalman.getX();
+                    y_measure_tf.data = position_in_cam_kalman.getY();
+
+                    std_msgs::Float32 x_global;
+                    std_msgs::Float32 y_global;
+                    x_global.data = position_in_world.getX() - 1;
+                    y_global.data = position_in_world.getY();
 
 
                     // write data to a bag file
@@ -243,10 +301,14 @@ class UavControl
                         bag_pid.write("pid_x", ros::Time::now(), x_msg);
                         bag_pid.write("pid_y", ros::Time::now(), y_msg);
 
-                        // bag_kalman.write("estimate_x", ros::Time::now(), x_estimate);
-                        // bag_kalman.write("estimate_y", ros::Time::now(), y_estimate);
-                        // bag_kalman.write("measurement_x", ros::Time::now(), x_measure);
-                        // bag_kalman.write("measurement_y", ros::Time::now(), y_measure);
+                        bag_kalman.write("estimate_x", ros::Time::now(), x_estimate);
+                        bag_kalman.write("estimate_y", ros::Time::now(), y_estimate);
+                        bag_kalman.write("measurement_x", ros::Time::now(), x_measure);
+                        bag_kalman.write("measurement_y", ros::Time::now(), y_measure);
+                        bag_kalman.write("measurement_tf_x", ros::Time::now(), x_measure_tf);
+                        bag_kalman.write("measurement_tf_y", ros::Time::now(), y_measure_tf);
+                        bag_kalman.write("global_x", ros::Time::now(), x_global);
+                        bag_kalman.write("global_y", ros::Time::now(), y_global);
                         // bag_kalman.write("actual_x", ros::Time::now(), x_actual);
                         // bag_kalman.write("actual_y", ros::Time::now(), y_actual);
 
@@ -372,8 +434,13 @@ class UavControl
         ros::Publisher PIDy;
 
         rosbag::Bag bag_pid;
-        // rosbag::Bag bag_kalman;
+        rosbag::Bag bag_kalman;
         rosbag::Bag bag_drone_pad_pos;
+        tf::TransformListener tf_listener;
+        tf::StampedTransform T_world_cam;
+        tf::StampedTransform T_world_cam_inv;
+        tf::Vector3 position_in_cam, position_in_world;
+        tf::Vector3 position_in_cam_kalman, position_in_world_kalman;
 };
      
 

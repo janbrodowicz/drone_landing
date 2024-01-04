@@ -75,7 +75,7 @@ import pandas as pd
 
 # b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/kalman_output_0.01_0.1_fixedbag.bag")
 # b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_CV_with_vel_measure/kalman_output_changed_impl_(R=1, P=0.1, w=0.001, input=0.0001)_mes.bag")
-# b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_CV_without_vel_measure/kalman_output_(R=1, P=0.1, w=0.0001, input=0.0001).bag")
+# b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_CV_without_vel_measure/kalman_output_with_noise_2(input=0.01, noise=0.0001).bag")
 # b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_CA/kalman_output_(R=0.1).bag")
 # b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_CP/kalman_output_changed_implementation.bag")
 # b = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_moving_pad/kalman_output.bag")
@@ -190,3 +190,119 @@ import pandas as pd
 # plt.show()
 
 # print(b.topic_table)
+
+
+#========================================================================================================================
+#========================================================================================================================
+
+b1 = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_moving_pad/kalman_output.bag")
+b2 = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_moving_pad/drone_pad_pos.bag")
+
+x_measurement = b1.message_by_topic("global_x")
+y_measurement = b1.message_by_topic("global_y")
+x_estimate = b1.message_by_topic("estimate_x")
+y_estimate = b1.message_by_topic("estimate_y")
+
+df_x_measurement = pd.read_csv(x_measurement)
+df_y_measurement = pd.read_csv(y_measurement)
+df_x_estimate = pd.read_csv(x_estimate)
+df_y_estimate = pd.read_csv(y_estimate)
+
+x_drone = b2.message_by_topic("drone_x")
+y_drone = b2.message_by_topic("drone_y")
+x_pad = b2.message_by_topic("pad_x")
+y_pad = b2.message_by_topic("pad_y")
+
+df_x_pad = pd.read_csv(x_pad)
+df_y_pad = pd.read_csv(y_pad)
+df_x_drone = pd.read_csv(x_drone)
+df_y_drone = pd.read_csv(y_drone)
+
+# df_y_measurement["data"] = df_y_measurement["data"] * (-1)
+
+plt.plot(df_x_measurement["data"].tolist(), df_y_measurement["data"].tolist(), 'o-', markersize=2.2)
+plt.plot(df_x_pad["data"].tolist(), df_y_pad["data"].tolist(), 'o-', markersize=2.2)
+plt.plot(df_x_estimate["data"].tolist(), df_y_estimate["data"].tolist(), 'ko-', markersize=2.2)
+# plt.plot(df_x_drone["data"].tolist()[10:], df_y_drone["data"].tolist()[10:], 'o-', markersize=2.2)
+plt.grid()
+plt.legend(["Measure", "Actual", "Estimate"])
+# plt.ylim([-0.2, 0.2])
+plt.show()
+
+
+#========================================================================================================================
+#========================================================================================================================
+
+# b1 = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_moving_pad/kalman_output_1.bag")
+# b2 = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_moving_pad/drone_pad_pos_1.bag")
+
+# x_measurement = b1.message_by_topic("measurement_x")
+# y_measurement = b1.message_by_topic("measurement_y")
+# x_estimate = b1.message_by_topic("estimate_x")
+# y_estimate = b1.message_by_topic("estimate_y")
+
+# df_x_measurement = pd.read_csv(x_measurement)
+# df_y_measurement = pd.read_csv(y_measurement)
+# df_x_estimate = pd.read_csv(x_estimate)
+# df_y_estimate = pd.read_csv(y_estimate)
+
+# x_pad = b2.message_by_topic("pad_x")
+# y_pad = b2.message_by_topic("pad_y")
+
+# df_x_pad = pd.read_csv(x_pad)
+# df_y_pad = pd.read_csv(y_pad)
+
+# np.subtract(df_x_pad['data'].to_list(), df_x_measurement['data'].to_list())
+
+# measure_error_x = np.subtract(df_x_pad['data'].to_list(), df_x_measurement['data'].to_list())
+# measure_error_y = np.subtract(df_y_pad['data'].to_list(), df_y_measurement['data'].to_list())
+# estimate_error_x = np.subtract(df_x_pad['data'].to_list(), df_x_estimate['data'].to_list())
+# estimate_error_y = np.subtract(df_y_pad['data'].to_list(), df_y_estimate['data'].to_list())
+
+
+# fig, ax = plt.subplots(2)
+# ax[0].plot(df_x_estimate["Time"].tolist(), estimate_error_x, 'k')
+# ax[0].plot(df_x_estimate["Time"].tolist(), measure_error_x)
+# ax[0].legend(["Estimate", "Measure"])
+# ax[0].grid()
+# ax[1].plot(df_x_estimate["Time"].tolist(), estimate_error_y, 'k')
+# ax[1].plot(df_x_estimate["Time"].tolist(), measure_error_y)
+# ax[1].legend(["Estimate", "Measure"])
+# ax[1].grid()
+# plt.show()
+
+
+#========================================================================================================================
+#========================================================================================================================
+
+
+# b1 = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_moving_pad/kalman_output.bag")
+# b2 = bagreader("/home/jan/catkin_ws/src/ros_landing/RosBag_vis/Kalman_bags/Kalman_moving_pad/drone_pad_pos.bag")
+
+# x_measurement = b1.message_by_topic("measurement_x")
+# y_measurement = b1.message_by_topic("measurement_y")
+# x_measurement_tf = b1.message_by_topic("measurement_tf_x")
+# y_measurement_tf = b1.message_by_topic("measurement_tf_y")
+
+# df_x_measurement = pd.read_csv(x_measurement)
+# df_y_measurement = pd.read_csv(y_measurement)
+# df_x_measurement_tf = pd.read_csv(x_measurement_tf)
+# df_y_measurement_tf = pd.read_csv(y_measurement_tf)
+
+# # df_x_measurement["data"] = df_x_measurement["data"] * (-1)
+# # df_y_measurement["data"] = df_y_measurement["data"] * (-1)
+
+# y_tf = np.subtract(df_y_measurement_tf["data"].tolist(), 1.2)
+# y_tf = y_tf * (-1)
+# df_x_measurement_tf["data"] = df_x_measurement_tf["data"] * (-1)
+
+# fig, ax = plt.subplots(2)
+# ax[0].plot(df_x_measurement["Time"].tolist(), df_x_measurement["data"].tolist())
+# ax[0].plot(df_x_measurement["Time"].tolist(), df_x_measurement_tf["data"].tolist(), 'k')
+# ax[0].legend(["Normal", "Estimate"])
+# ax[0].grid()
+# ax[1].plot(df_y_measurement["Time"].tolist(), df_y_measurement["data"].tolist())
+# ax[1].plot(df_y_measurement["Time"].tolist(), y_tf, 'k')
+# ax[1].legend(["Normal", "Estimate"])
+# ax[1].grid()
+# plt.show()

@@ -50,7 +50,7 @@
       <parent>box_link</parent>
     </joint>
 
-    <!-- <plugin name="push_animate" filename="libmoving_pad.so"/> -->
+    <plugin name="push_animate" filename="libmoving_pad.so"/>
     <!-- <plugin name="push_animate" filename="libmoving_pad_circle.so"/> -->
   </model>
 </sdf>

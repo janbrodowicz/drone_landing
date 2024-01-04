@@ -72,8 +72,8 @@ namespace kalman_CV
     //                               {0, 0, 1, 0},
     //                               {0, 0, 0, 1}};
 
-    Eigen::Matrix<double, 2, 2> R{{0.5, 0},
-                                  {0, 0.5}};
+    Eigen::Matrix<double, 2, 2> R{{1, 0},
+                                  {0, 1}};
 
     Eigen::Matrix<double, 4, 1> x0{{0.001}, {0.001}, {0.01}, {0.01}};
 
