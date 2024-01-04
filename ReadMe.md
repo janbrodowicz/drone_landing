@@ -19,7 +19,7 @@
 7. In launch directory open .launch file and change `<arg name="px4_dir" default="/home/jan/PX4/PX4-Autopilot"/>` to match your path
 8. Go to ~workspace_dir/src/mavros/mavros/launch/px4_config.yaml and change:
 
-	'''
+	```
 	local_position:
 	  frame_id: "map"
 	  tf:
@@ -30,7 +30,7 @@
    
    to:
    
-   	'''
+   	```
 	local_position:
 	  frame_id: "map"
 	  tf:
