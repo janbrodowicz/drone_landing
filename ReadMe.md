@@ -17,7 +17,27 @@
         
 6. Download Eigen library for C++ (https://eigen.tuxfamily.org/index.php?title=Main_Page), preferably 3.4.0
 7. In launch directory open .launch file and change `<arg name="px4_dir" default="/home/jan/PX4/PX4-Autopilot"/>` to match your path
-        
+8. Go to ~workspace_dir/src/mavros/mavros/launch/px4_config.yaml and change:
+
+	'''
+	local_position:
+	  frame_id: "map"
+	  tf:
+	    send: false
+	    frame_id: "map"
+	    child_frame_id: "base_link"
+	    send_fcu: false
+   
+   to:
+   
+   	'''
+	local_position:
+	  frame_id: "map"
+	  tf:
+	    send: true
+	    frame_id: "map"
+	    child_frame_id: "base_link"
+	    send_fcu: false
 
 ### Launching steps
 
