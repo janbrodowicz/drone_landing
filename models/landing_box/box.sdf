@@ -52,5 +52,8 @@
 
     <plugin name="push_animate" filename="libmoving_pad.so"/>
     <!-- <plugin name="push_animate" filename="libmoving_pad_circle.so"/> -->
+
+    <!-- <plugin name="push_animate" filename="libmoving_pad_01ms.so"/>
+    <plugin name="push_animate" filename="libmoving_pad_circle_01ms.so"/> -->
   </model>
 </sdf>

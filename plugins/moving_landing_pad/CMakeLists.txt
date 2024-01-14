@@ -19,3 +19,9 @@ target_link_libraries(moving_pad ${GAZEBO_LIBRARIES})
 
 add_library(moving_pad_circle SHARED moving_pad_circle.cc)
 target_link_libraries(moving_pad_circle ${GAZEBO_LIBRARIES})
+
+add_library(moving_pad_01ms SHARED moving_pad_01ms.cc)
+target_link_libraries(moving_pad_01ms ${GAZEBO_LIBRARIES})
+
+add_library(moving_pad_circle_01ms SHARED moving_pad_circle_01ms.cc)
+target_link_libraries(moving_pad_circle_01ms ${GAZEBO_LIBRARIES})

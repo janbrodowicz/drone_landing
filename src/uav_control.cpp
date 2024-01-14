@@ -84,6 +84,9 @@ class UavControl
             PIDx = nh.advertise<std_msgs::Float32>("PID/x", 10);
             PIDy = nh.advertise<std_msgs::Float32>("PID/y", 10);
 
+            x_measure_pub = nh.advertise<std_msgs::Float32>("x_measure", 10);
+            y_measure_pub = nh.advertise<std_msgs::Float32>("y_measure", 10);
+
             bag_pid.open("pid_output.bag", rosbag::bagmode::Write);
             bag_kalman.open("kalman_output.bag", rosbag::bagmode::Write);
             bag_drone_pad_pos.open("drone_pad_pos.bag", rosbag::bagmode::Write);
@@ -186,7 +189,7 @@ class UavControl
 
                     if(m_first_loop)
                     {
-                        Eigen::Matrix<double, 4, 1> init{{m_actual_pose[0]}, {m_actual_pose[1]}, {0.01}, {0.01}};
+                        Eigen::Matrix<double, 4, 1> init{{m_actual_pose[0]}, {m_actual_pose[1]}, {0.05}, {0.05}};
                         m_kalmanFilter.updateInitial(init);
                     }
                     
@@ -324,6 +327,9 @@ class UavControl
                     PIDx.publish(x_msg);
                     PIDy.publish(y_msg);
 
+                    x_measure_pub.publish(x_measure);
+                    y_measure_pub.publish(y_measure);
+
                     m_first_loop = false;
                 }
             }
@@ -432,6 +438,9 @@ class UavControl
 
         ros::Publisher PIDx;
         ros::Publisher PIDy;
+
+        ros::Publisher x_measure_pub;
+        ros::Publisher y_measure_pub;
 
         rosbag::Bag bag_pid;
         rosbag::Bag bag_kalman;
@@ -583,18 +592,18 @@ int main(int argc, char **argv)
                 }
 				break;
 			case KEYCODE_U:
-                if(!uav.m_landing)
-                {
+                // if(!uav.m_landing)
+                // {
                     pos.velocity.z += 0.1;
                     ROS_INFO("X: %f, Y: %f, Z: %f, Yaw: %f", pos.velocity.x, pos.velocity.y, pos.velocity.z, pos.yaw_rate);
-                }  
+                // }  
 				break;
 			case KEYCODE_D:
-                if(!uav.m_landing)
-                {
+                // if(!uav.m_landing)
+                // {
                     pos.velocity.z -= 0.1;
                     ROS_INFO("X: %f, Y: %f, Z: %f, Yaw: %f", pos.velocity.x, pos.velocity.y, pos.velocity.z, pos.yaw_rate);
-                }
+                // }
 				break;	
             case KEYCODE_Z:
                 if(!uav.m_landing)
@@ -645,8 +654,10 @@ int main(int argc, char **argv)
         {
             if(uav.m_lidar > 0.5)
             {
-                uav.pid_x.update_pid_settings({0.4, 0.0, 0.0});
-                uav.pid_y.update_pid_settings({0.4, 0.0, 0.0});
+                uav.pid_x.update_pid_settings({0.45, 0.0, 0.0});
+                uav.pid_y.update_pid_settings({0.45, 0.0, 0.0});
+                // uav.pid_x.update_pid_settings({0.4, 0.005, 0.1});
+                // uav.pid_y.update_pid_settings({0.4, 0.005, 0.1});
 
                 pos.velocity.y = uav.m_x_pid;
                 pos.velocity.x = uav.m_y_pid;
