@@ -7,6 +7,7 @@
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 #include <ros_landing/droneLand.h>
+#include <std_srvs/Empty.h>
 
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
@@ -38,6 +39,9 @@ class VisionProcessingControll
         {
             droneLand_pub = nh.advertise<ros_landing::droneLand>("/droneLand", 10);
 
+            pauseGazebo = nh.serviceClient<std_srvs::Empty>("/gazebo/pause_physics");
+            unpauseGazebo = nh.serviceClient<std_srvs::Empty>("/gazebo/unpause_physics");
+
             image_sub.subscribe(nh, "/iris/usb_cam/image_raw", 1);
             lidar_sub.subscribe(nh, "/laser/scan", 1);
 
@@ -55,6 +59,9 @@ class VisionProcessingControll
 
         void callback(const sensor_msgs::Image::ConstPtr& img, const sensor_msgs::LaserScan::ConstPtr& lidar)
         {
+            std_srvs::Empty emptySrv;
+            pauseGazebo.call(emptySrv);
+
             // -------------------------------------------------------------------------------------------------------------------
             // Converting image message to OpenCV format
             // -------------------------------------------------------------------------------------------------------------------
@@ -136,6 +143,8 @@ class VisionProcessingControll
             double angle = std::get<2>(iter_res);
             std::vector<std::vector<double>> dist_vec = object.calc_dist(centre);
 
+            unpauseGazebo.call(emptySrv);
+
             // Publish data for drone controll (with PID)
             ros_landing::droneLand msgDrone;
             msgDrone.X = dist_vec[1][0];
@@ -159,6 +168,9 @@ class VisionProcessingControll
         message_filters::Subscriber<sensor_msgs::Image> image_sub;
         message_filters::Subscriber<sensor_msgs::LaserScan> lidar_sub;
         message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::LaserScan> sync;
+
+        ros::ServiceClient pauseGazebo;
+        ros::ServiceClient unpauseGazebo;
 
 };
 
